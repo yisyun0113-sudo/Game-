@@ -1,13 +1,593 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Document</title>
-  
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>互動小遊戲</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Antique&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d0a14;
+    --panel: rgba(15, 10, 30, 0.92);
+    --border: rgba(180, 140, 255, 0.25);
+    --accent: #c49bff;
+    --accent2: #ff9bce;
+    --text: #e8deff;
+    --dim: #8a7aaa;
+    --choice-bg: rgba(100, 60, 180, 0.15);
+    --choice-hover: rgba(140, 90, 240, 0.3);
+  }
+
+  body {
+    font-family: 'Noto Serif TC', serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── 背景 ── */
+  #scene-bg {
+    position: fixed;
+    inset: 0;
+    background: #1a0a2e;
+    transition: background 1.2s ease;
+    z-index: 0;
+  }
+  #scene-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(120,60,200,0.3) 0%, transparent 70%);
+  }
+
+  /* ── 星星粒子 ── */
+  .stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    animation: twinkle linear infinite;
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0.1; } 50% { opacity: 0.9; }
+  }
+
+  /* ── 遊戲容器 ── */
+  #game {
+    position: relative;
+    z-index: 10;
+    width: min(720px, 95vw);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── 場景標籤 ── */
+  #scene-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: right;
+    padding-right: 4px;
+    min-height: 16px;
+    transition: opacity 0.5s;
+  }
+
+  /* ── 角色立繪區 ── */
+  #character-area {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    height: 120px;
+    position: relative;
+  }
+  #character-sprite {
+    font-size: 90px;
+    line-height: 1;
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.4s;
+    filter: drop-shadow(0 0 20px rgba(180,140,255,0.5));
+  }
+  #character-sprite.shake {
+    animation: shake 0.5s ease;
+  }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
+  }
+
+  /* ── 對話框 ── */
+  #dialog-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 60px rgba(100,60,200,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative;
+    min-height: 110px;
+  }
+  #speaker-name {
+    font-size: 13px;
+    letter-spacing: 2px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 10px;
+    min-height: 18px;
+  }
+  #dialog-text {
+    font-size: 17px;
+    line-height: 1.85;
+    color: var(--text);
+  }
+  /* 打字游標 */
+  #cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 0.8s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* 繼續提示 */
+  #continue-hint {
+    position: absolute;
+    bottom: 14px;
+    right: 20px;
+    font-size: 12px;
+    color: var(--dim);
+    animation: float 1.5s ease-in-out infinite;
+    cursor: pointer;
+    display: none;
+  }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+
+  /* ── 選項區 ── */
+  #choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: opacity 0.4s;
+  }
+  .choice-btn {
+    background: var(--choice-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 15px;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .choice-btn::before {
+    content: '▸';
+    color: var(--accent);
+    margin-right: 10px;
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+  .choice-btn:hover {
+    background: var(--choice-hover);
+    border-color: rgba(180,140,255,0.5);
+    transform: translateX(4px);
+  }
+  .choice-btn:hover::before { transform: translateX(3px); }
+  .choice-btn:active { transform: translateX(2px) scale(0.99); }
+
+  /* ── 結局畫面 ── */
+  #ending-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(5,2,12,0.95);
+    backdrop-filter: blur(10px);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 20px;
+    animation: fadeIn 1s ease;
+  }
+  #ending-screen.show { display: flex; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  #ending-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 4px;
+  }
+  #ending-text {
+    font-size: 17px;
+    color: var(--dim);
+    max-width: 400px;
+    line-height: 1.9;
+  }
+  #restart-btn {
+    margin-top: 12px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Noto Serif TC', serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    padding: 12px 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  #restart-btn:hover { background: var(--accent); color: var(--bg); }
+
+  /* 進度條 */
+  #progress-bar {
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+    align-self: flex-start;
+  }
+</style>
 </head>
 <body>
 
+<div id="scene-bg"></div>
+<div class="stars" id="stars"></div>
+
+<div id="game">
+  <div id="scene-label"></div>
+  <div id="progress-bar" style="width:0%"></div>
+  <div id="character-area">
+    <div id="character-sprite"></div>
+  </div>
+  <div id="dialog-box">
+    <div id="speaker-name"></div>
+    <div id="dialog-text"></div>
+    <div id="continue-hint">點擊繼續 ▾</div>
+  </div>
+  <div id="choices"></div>
+</div>
+
+<div id="ending-screen">
+  <div id="ending-title"></div>
+  <div id="ending-text"></div>
+  <button id="restart-btn" onclick="startGame()">↺ 再玩一次</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//   🎨 劇情資料 ── 在這裡自訂你的故事！
+// ═══════════════════════════════════════════════
+
+const STORY = {
+
+  // ── 場景定義 ──────────────────────────────────
+  // 每個場景有唯一 ID，包含：
+  //   scene   : 顯示在右上角的場景名稱（可選）
+  //   bg      : 背景顏色（CSS 顏色值，可選）
+  //   sprite  : 角色表情 emoji（可選）
+  //   speaker : 說話者姓名（空字串 = 旁白）
+  //   text    : 對話內容
+  //   next    : 下一幕 ID（若無選項）
+  //   choices : 選項陣列 [{ text, next }, ...]
+  //   ending  : true 代表結局（會觸發結局畫面）
+  //   endTitle: 結局標題
+  //   endText : 結局說明
+
+  scenes: {
+
+    // ── 開場 ──
+    "start": {
+      scene: "黎明前的廣場",
+      bg: "#0d0820",
+      sprite: "🌙",
+      speaker: "",
+      text: "月色淡薄，廣場上只剩一盞搖曳的燈。一個身影從暗處走來——",
+      next: "intro_1"
+    },
+
+    "intro_1": {
+      sprite: "🧙",
+      speaker: "神秘旅者",
+      text: "你好，旅人。我等你很久了。",
+      next: "intro_2"
+    },
+
+    "intro_2": {
+      sprite: "🧙",
+      speaker: "神秘旅者",
+      text: "傳說中的遺跡就在北方。你願意和我一同前往嗎？",
+      choices: [
+        { text: "「我願意，出發吧！」", next: "accept" },
+        { text: "「你到底是誰？先說清楚。」", next: "ask_who" },
+        { text: "「我不感興趣。」", next: "refuse" }
+      ]
+    },
+
+    // ── 分支 A：接受 ──
+    "accept": {
+      scene: "通往北方的山道",
+      bg: "#0a1a20",
+      sprite: "🧙",
+      speaker: "神秘旅者",
+      text: "很好。你的勇氣令我欣慰。路上我來告訴你遺跡的秘密……",
+      next: "journey"
+    },
+
+    "journey": {
+      sprite: "🌄",
+      speaker: "",
+      text: "兩人沿著山道一路北行，晨光漸漸染紅天際。遠處，遺跡的輪廓若隱若現。",
+      next: "ruin_gate"
+    },
+
+    // ── 分支 B：詢問身份 ──
+    "ask_who": {
+      sprite: "🧙",
+      speaker: "神秘旅者",
+      text: "哈……問得好。我叫 Elan，是遺跡的守護者後裔。而你，也許是被命運選中的人。",
+      next: "ask_who_2"
+    },
+
+    "ask_who_2": {
+      sprite: "🧙",
+      speaker: "Elan",
+      text: "現在你願意跟我走了嗎？",
+      choices: [
+        { text: "「好，帶路吧。」", next: "accept" },
+        { text: "「還是算了。」", next: "refuse" }
+      ]
+    },
+
+    // ── 分支 C：拒絕 ──
+    "refuse": {
+      scene: "廣場一角",
+      bg: "#140a0a",
+      sprite: "🧙",
+      speaker: "Elan",
+      text: "那……也許緣分未到。若你改變心意，我會在北方等你。",
+      next: "refuse_end"
+    },
+
+    "refuse_end": {
+      sprite: "🌙",
+      speaker: "",
+      text: "旅者轉身消失在夜色中。你獨自留在廣場，不知道自己錯過了什麼。",
+      ending: true,
+      endTitle: "孤獨的終點",
+      endText: "也許有些門，一旦關上就不再開啟。\n\n這是結局 C：拒絕同行。"
+    },
+
+    // ── 遺跡入口 ──
+    "ruin_gate": {
+      scene: "遺跡大門前",
+      bg: "#0a1a10",
+      sprite: "🏛️",
+      speaker: "",
+      text: "巨大的石門刻滿古老符文，中央有三個凹槽，分別散發著不同光芒。",
+      next: "ruin_choice"
+    },
+
+    "ruin_choice": {
+      sprite: "🧙",
+      speaker: "Elan",
+      text: "傳說石門只回應純粹的意志。你的選擇，將決定遺跡開啟的方式。",
+      choices: [
+        { text: "觸碰閃著金光的符文（智慧之門）", next: "end_wisdom" },
+        { text: "觸碰閃著紅光的符文（勇氣之門）", next: "end_courage" },
+        { text: "觸碰閃著藍光的符文（命運之門）", next: "end_fate" }
+      ]
+    },
+
+    // ── 結局 A ──
+    "end_wisdom": {
+      ending: true,
+      endTitle: "智慧的傳承",
+      endText: "金光大盛，石門緩緩開啟。\n古老的知識如洪流湧入你的心智。\n\n你成為了下一代守護者。\n\n🏆 結局 A：智者之路"
+    },
+
+    // ── 結局 B ──
+    "end_courage": {
+      ending: true,
+      endTitle: "勇者的試煉",
+      endText: "紅光如火焰迸發，遺跡深處傳來怒吼。\n你握緊拳頭，踏入黑暗——\n\n無論前方是什麼，你都不再退縮。\n\n⚔️ 結局 B：勇者之路"
+    },
+
+    // ── 結局 C ──
+    "end_fate": {
+      ending: true,
+      endTitle: "命運的回響",
+      endText: "藍光將你包裹，時間彷彿靜止。\nElan 低聲說：「原來是你……」\n\n一切謎題，在此揭曉。\n\n✨ 結局 D：命運之路"
+    }
+
+  },
+
+  // ── 起始場景 ID ──
+  startScene: "start",
+
+  // ── 進度計算（可選：填入關鍵場景 ID，用於進度條）──
+  milestones: ["start", "intro_2", "ruin_gate", "ruin_choice"]
+
+};
+
+// ═══════════════════════════════════════════════
+//   ⚙️ 遊戲引擎（不需要修改）
+// ═══════════════════════════════════════════════
+
+let currentScene = null;
+let isTyping = false;
+let typeTimer = null;
+let fullText = "";
+let shownText = "";
+const TYPING_SPEED = 40; // ms per character
+
+const elBg = document.getElementById('scene-bg');
+const elLabel = document.getElementById('scene-label');
+const elSprite = document.getElementById('character-sprite');
+const elSpeaker = document.getElementById('speaker-name');
+const elDialog = document.getElementById('dialog-text');
+const elChoices = document.getElementById('choices');
+const elHint = document.getElementById('continue-hint');
+const elEnding = document.getElementById('ending-screen');
+const elEndTitle = document.getElementById('ending-title');
+const elEndText = document.getElementById('ending-text');
+const elProgress = document.getElementById('progress-bar');
+
+// 生成星星
+function makeStars() {
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 0.5;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      top:${Math.random()*100}%;
+      animation-duration:${2+Math.random()*4}s;
+      animation-delay:${Math.random()*4}s;
+    `;
+    container.appendChild(s);
+  }
+}
+
+function loadScene(id) {
+  const scene = STORY.scenes[id];
+  if (!scene) { console.error('找不到場景:', id); return; }
+  currentScene = id;
+
+  // 背景色
+  if (scene.bg) elBg.style.background = scene.bg;
+
+  // 場景標籤
+  elLabel.textContent = scene.scene || '';
+
+  // 角色表情
+  if (scene.sprite !== undefined) {
+    elSprite.textContent = scene.sprite;
+    elSprite.style.opacity = '1';
+  }
+
+  // 說話者
+  elSpeaker.textContent = scene.speaker || '';
+
+  // 對話打字效果
+  fullText = scene.text || '';
+  shownText = '';
+  elDialog.innerHTML = '';
+  elChoices.innerHTML = '';
+  elHint.style.display = 'none';
+  isTyping = true;
+
+  clearInterval(typeTimer);
+  let i = 0;
+  typeTimer = setInterval(() => {
+    if (i < fullText.length) {
+      shownText += fullText[i++];
+      elDialog.innerHTML = shownText + '<span id="cursor"></span>';
+    } else {
+      clearInterval(typeTimer);
+      isTyping = false;
+      elDialog.innerHTML = shownText;
+      // 顯示選項或繼續提示
+      if (scene.choices) {
+        renderChoices(scene.choices);
+      } else if (!scene.ending) {
+        elHint.style.display = 'block';
+      }
+    }
+  }, TYPING_SPEED);
+
+  // 結局場景
+  if (scene.ending) {
+    setTimeout(() => showEnding(scene), fullText.length * TYPING_SPEED + 800);
+  }
+
+  // 進度條
+  updateProgress(id);
+}
+
+function renderChoices(choices) {
+  elChoices.innerHTML = '';
+  choices.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = c.text;
+    btn.style.animationDelay = `${i * 80}ms`;
+    btn.style.opacity = '0';
+    btn.style.transform = 'translateY(10px)';
+    btn.style.transition = `opacity 0.3s ${i*80}ms, transform 0.3s ${i*80}ms, background 0.2s`;
+    setTimeout(() => {
+      btn.style.opacity = '1';
+      btn.style.transform = 'translateY(0)';
+    }, 50);
+    btn.onclick = () => {
+      elChoices.style.opacity = '0';
+      setTimeout(() => { elChoices.innerHTML = ''; loadScene(c.next); }, 300);
+    };
+    elChoices.appendChild(btn);
+  });
+  elChoices.style.opacity = '1';
+}
+
+function updateProgress(id) {
+  const m = STORY.milestones;
+  const idx = m.indexOf(id);
+  if (idx >= 0) {
+    const pct = Math.round(((idx + 1) / m.length) * 100);
+    elProgress.style.width = pct + '%';
+  }
+}
+
+function showEnding(scene) {
+  elEndTitle.textContent = scene.endTitle || '結局';
+  elEndText.textContent = scene.endText || '';
+  elEnding.classList.add('show');
+  elProgress.style.width = '100%';
+}
+
+function startGame() {
+  elEnding.classList.remove('show');
+  elProgress.style.width = '0%';
+  elBg.style.background = '#1a0a2e';
+  loadScene(STORY.startScene);
+}
+
+// 點擊跳過打字 / 繼續
+document.getElementById('dialog-box').addEventListener('click', () => {
+  if (isTyping) {
+    // 跳過打字動畫
+    clearInterval(typeTimer);
+    isTyping = false;
+    elDialog.innerHTML = fullText;
+    const scene = STORY.scenes[currentScene];
+    if (scene.choices) renderChoices(scene.choices);
+    else if (!scene.ending) elHint.style.display = 'block';
+  } else {
+    const scene = STORY.scenes[currentScene];
+    if (scene && scene.next && !scene.choices && !scene.ending) {
+      elHint.style.display = 'none';
+      loadScene(scene.next);
+    }
+  }
+});
+
+// 初始化
+makeStars();
+startGame();
+</script>
 </body>
 </html>
