@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>高塔迴聲</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0b0d10;
+    --panel:#15191e;
+    --panel-raised:#1c2129;
+    --line:#2a313b;
+    --ink:#d6dbe0;
+    --ink-dim:#7d8894;
+    --parchment:#e9ddc2;
+    --teal:#5fb3a3;
+    --amber:#c9973f;
+    --red:#b23b3b;
+    --mono: 'Space Mono', monospace;
+    --serif: 'Lora', serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--void);color:var(--ink);font-family:var(--serif);}
+  body{min-height:100vh;display:flex;justify-content:center;}
+  #app{width:100%;max-width:960px;display:flex;min-height:100vh;}
+
+  /* -------- 左側：塔層垂直軸（signature element） -------- */
+  #shaft{
+    width:64px;flex-shrink:0;position:relative;
+    border-right:1px solid var(--line);
+    padding:24px 0;display:flex;flex-direction:column;align-items:center;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent 30%);
+  }
+  #shaft .shaft-line{
+    position:absolute;top:24px;bottom:24px;left:50%;width:1px;
+    background:var(--line);transform:translateX(-50%);
+  }
+  #shaft-ticks{position:relative;z-index:1;display:flex;flex-direction:column;gap:0;width:100%;align-items:center;}
+  .tick{
+    font-family:var(--mono);font-size:10px;color:var(--ink-dim);
+    width:28px;height:24px;display:flex;align-items:center;justify-content:center;
+    border-radius:3px;transition:all .25s ease;
+  }
+  .tick.done{color:#3d4650;}
+  .tick.current{
+    color:var(--void);background:var(--teal);font-weight:700;
+    box-shadow:0 0 12px rgba(95,179,163,.6);
+  }
+
+  /* -------- 右側主內容 -------- */
+  #main{flex:1;display:flex;flex-direction:column;min-width:0;}
+
+  #statusbar{
+    display:flex;flex-wrap:wrap;gap:0;
+    border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:11px;letter-spacing:.03em;
+  }
+  .stat{
+    padding:10px 14px;border-right:1px solid var(--line);color:var(--ink-dim);
+    display:flex;gap:6px;align-items:baseline;
+  }
+  .stat b{color:var(--ink);font-size:13px;}
+  .stat.hp b{color:var(--red);}
+
+  #content{flex:1;padding:32px 36px;display:flex;flex-direction:column;gap:20px;}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--teal);
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:var(--serif);font-weight:600;font-size:26px;margin:0;color:var(--ink);
+    line-height:1.3;
+  }
+  .narrative{
+    font-family:var(--serif);font-size:16px;line-height:1.85;color:var(--parchment);
+    white-space:pre-line;
+    border-left:2px solid var(--line);padding-left:16px;
+  }
+  .narrative.flashback{border-left-color:var(--amber);}
+  .devnote{
+    font-family:var(--mono);font-size:11px;color:var(--amber);
+    background:rgba(201,151,63,.08);border:1px solid rgba(201,151,63,.3);
+    padding:8px 10px;border-radius:4px;
+  }
+
+  #choices{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+  button.choice{
+    font-family:var(--serif);font-size:15px;color:var(--ink);
+    background:var(--panel-raised);border:1px solid var(--line);
+    padding:12px 16px;border-radius:4px;text-align:left;cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  button.choice:hover{border-color:var(--teal);}
+  button.choice:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+  button.choice:active{transform:scale(0.99);}
+  button.primary{
+    font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--void);background:var(--teal);border:none;
+    padding:12px 20px;border-radius:4px;cursor:pointer;align-self:flex-start;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.primary:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+
+  #textInputRow{display:flex;gap:8px;margin-top:4px;}
+  #textInputRow input{
+    flex:1;font-family:var(--mono);font-size:14px;background:var(--panel-raised);
+    border:1px solid var(--line);color:var(--ink);padding:10px 12px;border-radius:4px;
+  }
+  #textInputRow input:focus-visible{outline:2px solid var(--teal);}
+
+  .hpbars{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
+  .hpbar-label{font-family:var(--mono);font-size:11px;color:var(--ink-dim);display:flex;justify-content:space-between;}
+  .hpbar-track{height:8px;background:var(--panel-raised);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+  .hpbar-fill{height:100%;background:var(--red);transition:width .25s ease;}
+  .hpbar-fill.player{background:var(--teal);}
+
+  #log{
+    font-family:var(--mono);font-size:12px;color:var(--ink-dim);
+    display:flex;flex-direction:column;gap:2px;max-height:110px;overflow-y:auto;
+    border-top:1px dashed var(--line);padding-top:8px;
+  }
+
+  #flagbar{
+    margin-top:auto;padding-top:16px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10px;color:var(--ink-dim);
+    display:flex;flex-wrap:wrap;gap:6px;
+  }
+  .flagchip{padding:3px 8px;border:1px solid var(--line);border-radius:12px;}
+  .flagchip.on{color:var(--amber);border-color:var(--amber);}
+
+  @media (max-width:640px){
+    #shaft{width:40px;}
+    .tick{width:22px;font-size:8px;}
+    #content{padding:20px 18px;}
+    h1{font-size:21px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <nav id="shaft" aria-label="樓層進度">
+    <div class="shaft-line" aria-hidden="true"></div>
+    <div id="shaft-ticks"></div>
+  </nav>
+  <main id="main">
+    <div id="statusbar"></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+ * 《高塔迴聲》資料層
+ * 說明同 data.js：仍保留原始 TODO 標記，供之後補齊素材。
+ * 本檔案為單頁可玩原型，會直接讀取下方 gameData 執行流程。
+ * =================================================================== */
+const gameData = {
+  meta: {
+    startingStats: { STR: 5, DEX: 5, INT: 5, CHA: 5, HP: 200, HPMax: 200 },
+  },
+  floorOrder: [30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,"B1","B2"],
+  monsters: {
+    "C-93": { name: "三頭犬 C-93", hp: 110, atkRange: [10,16] },
+    "W-12": { name: "狼人 W-12", hp: 130, atkRange: [11,18] },
+    "L-35": { name: "蜥蜴人 L-35", hp: 150, atkRange: [13,20] },
+    "G-47": { name: "石像鬼 G-47", hp: 165, atkRange: [14,19] },
+    "D-8": { name: "龍 D-8", hp: 180, atkRange: [16,21] },
+    "BOSS-00": { name: "原型-00「守望者」", hp: 300, atkRange: [18,28], isBoss:true },
+  },
+  floors: {
+    30: { type:"start", title:"高塔第30層 - 起始場景",
+      narrative:"一個陰暗的房間，主角坐在椅子上被綁住，身上穿著印有編號的衣服，眼前的門似乎被鎖住了。腦中一陣刺痛，記憶像被撕碎的羊皮紙——但內心深處有個聲音不斷催促著：逃離這裡。",
+      startSteps:[
+        { choices:[
+          {label:"觀察繩子", effect:{INT:2}, result:"繩子有點鬆"},
+          {label:"呼救", effect:{CHA:2}, result:"沒人回應"},
+        ]},
+        { auto:{effect:{STR:1}, result:"你用力掙脫，繩子鬆動，成功解開"} },
+        { choices:[
+          {label:"瘋狂敲打", effect:{STR:3, strChoicesCount:1}, result:"門鎖壞了，門開了"},
+          {label:"觀察門", result:"發現密碼鎖，輸入衣服上的編號，門開了"},
+        ]},
+      ],
+    },
+    29: { type:"puzzle_text", title:"解謎文字① - 誠實國與說謊國",
+      narrative:"誠實國與說謊國學者開會，主席說共9人，但坐在主席左邊的人記錄為8人；每個人都說坐在自己右邊的是說謊國的人。請問實際有幾人參加？",
+      options:[{label:"7人",value:"7"},{label:"8人",value:"8"},{label:"9人",value:"9"}], answer:"8" },
+    28: { type:"monster_and_potion", title:"怪物：三頭犬 C-93", narrative:"難度最低，教學戰。", monsterId:"C-93" },
+    27: { type:"puzzle_math", title:"解謎數學① - 數列規律",
+      narrative:"（原始圖片題目缺失，暫以文字數列代替，數值待確認）一組數字依照固定倍率增加：3, 6, 12, 24, ?, 96",
+      devnote:"⚠ TODO：原始為圖片題，答案156與此替代數列邏輯不連貫，待補上原始素材後修正。",
+      options:[{label:"48",value:"48"},{label:"156",value:"156"},{label:"72",value:"72"}], answer:"__TODO__" },
+    26: { type:"stat_boost", title:"永久屬性提升 - STR", narrative:"一座小型培養艙，觸碰後產生輕微記憶閃回。", effect:{STR:5} },
+    25: { type:"puzzle_text", title:"解謎文字⑤ - 研究員日記（隱藏線索）",
+      narrative:"你在牆縫中找到一張泛黃的紙條：\n「開始的幾批實驗體都失敗了，真是令人沮喪。二號這孩子雖然活了下來，但精神狀態極不穩定。四周的守衛必須加強，絕不能讓任何人靠近高塔。」",
+      isReadOnly:true, setFlagsOnRead:{solvedDiary25:true, unlockedFloor24:true},
+      resultNote:"解開後解鎖 floor24 的隱藏密室。" },
+    24: { type:"monster", title:"怪物：狼人 W-12（隱藏密室）",
+      narrative:"因你解開了 floor25 的日記，密室的門緩緩開啟。", monsterId:"W-12", requiresFlag:"unlockedFloor24" },
+    23: { type:"potion", title:"藥水點" },
+    22: { type:"puzzle_text", title:"解謎文字② - 顏色規律",
+      narrative:"5×5 格子中的圓圈依規律變色，問號處應填什麼顏色？",
+      devnote:"⚠ TODO：原始為圖片題，此處缺圖，答案暫定「藍」待核對。",
+      options:[{label:"紅",value:"red"},{label:"藍",value:"blue"},{label:"綠",value:"green"}], answer:"blue" },
+    21: { type:"puzzle_math", title:"解謎數學② - 符號推理（KFC）",
+      narrative:"運算符號被替換成圖案，經過推理後結果指向一個速食店縮寫。",
+      devnote:"⚠ TODO：原始為圖片題，此處缺圖，答案暫定 KFC。",
+      inputAnswer:"kfc" },
+    20: { type:"monster_and_potion", title:"怪物：蜥蜴人 L-35", monsterId:"L-35" },
+    19: { type:"puzzle_text", title:"解謎文字③ - A/B/C 說謊邏輯",
+      narrative:"A、B、C三人中只有一人說真話。A說「B在說謊」，B說「C在說謊」，C說「A、B都在說謊」。誰說真話？",
+      options:[{label:"A",value:"A"},{label:"B",value:"B"},{label:"C",value:"C"}], answer:"B" },
+    18: { type:"stat_boost", title:"永久屬性提升 - DEX", effect:{DEX:5} },
+    17: { type:"puzzle_math", title:"解謎數學③ - 六角拼圖",
+      narrative:"六角形拼圖依規律排列，問號處應放上什麼數字？",
+      devnote:"⚠ TODO：原始為圖片題，此處缺圖，答案暫定 6。",
+      inputAnswer:"6" },
+    16: { type:"potion", title:"藥水點" },
+    15: { type:"puzzle_text_and_potion", title:"解謎文字④ - 紀念亡友",
+      narrative:"牆上刻著一串褪色的字跡，你依稀認出這是某個孩子的名字縮寫組合，你試著拼湊完整——",
+      inputAnswer:"abel", setFlagsOnSolve:{remembersAbel:true},
+      resultNote:"這是主角某個早逝玩伴的名字。（回憶閃現內容待補：TODO）", flashback:true },
+    14: { type:"monster", title:"怪物：石像鬼 G-47", monsterId:"G-47" },
+    13: { type:"puzzle_text", title:"解謎文字⑥ - 孩子人數之謎",
+      narrative:"研究記錄殘頁上寫著：「共帶回12名孩子，實驗淘汰率83%。」你算了算，最後存活的孩子還剩幾人？",
+      options:[{label:"1人",value:"1"},{label:"2人",value:"2"},{label:"3人",value:"3"}], answer:"2",
+      setFlagsOnSolve:{knowsSurvivorCount:true},
+      resultNote:"暗示主角並非唯一倖存者。" },
+    12: { type:"stat_boost", title:"永久屬性提升 - 血量上限", effect:{HPMax:5} },
+    11: { type:"puzzle_text", title:"解謎文字⑦ - 鏡子邏輯",
+      narrative:"「鏡中的我舉起左手，我舉起的卻是右手；但鏡中的『我』，是否也在懷疑鏡子外的才是倒影？」\n房間裡有三面鏡子，只有一面鏡子裡的影像動作與現實不同步。請問，如何用最少的動作找出哪一面是「假鏡子」？",
+      options:[
+        {label:"同時舉起雙手觀察三面鏡子反應",value:"raise"},
+        {label:"對其中一面鏡子丟東西",value:"throw"},
+        {label:"把三面鏡子都打破",value:"break"},
+      ], answer:"raise", setFlagsOnSolve:{suspectsMirror:true},
+      resultNote:"呼應真結局「主角本身可能也是一面被替換的鏡子」的主題。" },
+    10: { type:"potion", title:"藥水點" },
+    9: { type:"puzzle_math_and_potion", title:"解謎數學④ - 數字規律",
+      narrative:"數字間有某種規律，請找出「？」應填什麼？",
+      devnote:"⚠ TODO：原始為圖片題，此處缺圖，答案暫定 2。",
+      inputAnswer:"2" },
+    8: { type:"stat_boost", title:"永久屬性提升 - INT", effect:{INT:5} },
+    7: { type:"stat_check", title:"解謎文字⑧ - 牆上刻的名字",
+      narrative:"牆角刻著三個名字：「Abel」、「Mira」、「Юri」，旁邊被刀刻掉了第四個名字，只留下模糊的字首「07」。你忽然感到一陣暈眩——",
+      checkStat:"INT", threshold:9,
+      onSuccess:{result:"你隱約想起，那個被刮掉的名字，好像跟你有關。", setFlags:{sawCarvedNames:true}},
+      onFailure:{result:"你只覺得頭痛欲裂，什麼都想不起來。"} },
+    6: { type:"monster_and_potion", title:"怪物：龍 D-8", narrative:"最終戰前最強雜兵。", monsterId:"D-8" },
+    5: { type:"stat_boost", title:"永久屬性提升 - CHA", effect:{CHA:5} },
+    4: { type:"puzzle_math", title:"解謎數學⑤ - 節能倍增公式",
+      narrative:"控制面板上有一串數字：2, 4, 8, 16, ? 這是塔內動力系統的節能倍增公式。",
+      options:[{label:"24",value:"24"},{label:"32",value:"32"},{label:"20",value:"20"}], answer:"32" },
+    3: { type:"puzzle_text", title:"解謎文字⑨ - 身世編號謎題",
+      narrative:"控制室門口的鎖需要輸入四位數編號才能通過，牆上留有提示：「若你忘記自己是誰，答案就刻在你身上。」",
+      devnote:"⚠ TODO：確認正式編號是否為完整四位數（例如 0724，呼應 floor25），此處暫用 07。",
+      inputAnswer:"07", setFlagsOnSolve:{recalledNumber:true} },
+    2: { type:"puzzle_math", title:"解謎數學⑥ - 最終謎題（動態答案）",
+      narrative:"在 END BOSS 門前，最後一道鎖需要驗證：「07 加上你在這座塔裡失去的朋友人數，等於多少？」",
+      dynamicAnswer:{base:7, countFlags:["remembersAbel","sawCarvedNames"]},
+      devnote:"答案依你目前收集到的亡友線索旗標動態計算（預設劇本建議：09）。" },
+    1: { type:"boss", title:"END BOSS - 原型-00「守望者」", monsterId:"BOSS-00",
+      narrative:"這具兵器的外型，與你舊玩伴們有著幾分相似的殘影——身上甚至還留著和你相同款式的編號衣服殘片。" },
+  },
+  underground: {
+    B1: { title:"地下一層：檔案室",
+      fullText:"「實驗體07號，代號：主角原名。植入記憶模板來源：已故音樂家/或設定為某位亡友的人格殘片。目前情感反饋數值波動過大，建議持續施打鎮定劑。若情感崩潰指數超標，啟動『兵器化』協議。」",
+      partialText:"（TODO：旗標不足3個時的替代版本文字待補齊）房間裡堆滿了無法閱讀的燒毀檔案，你什麼線索都拼湊不出來。",
+      requiresFlags:["solvedDiary25","knowsSurvivorCount","suspectsMirror","sawCarvedNames","recalledNumber"], minCount:3 },
+    B2: { title:"地下二層：核心控制室（結局選擇點）",
+      narrative:"最終抉擇的時刻到了。" },
+  },
+  endings: {
+    ending1_destroyTower: { title:"結局1：摧毀高塔", text:"TODO：補上完整結局文字。" },
+    ending2_cloneResearch:{ title:"結局2：複製人技術／基因改造研究", text:"TODO：補上完整結局文字。" },
+    ending3_villageScholar:{ title:"結局3：村莊學者", text:"TODO：補上完整結局文字。" },
+    ending4_merchant:{ title:"結局4：貿易商人", text:"TODO：補上完整結局文字。" },
+    endingTrue_revealed:{ title:"真結局：揭露身世", text:"TODO：補上完整結局文字，需整合 B1 檔案室內容與各旗標線索。" },
+    endingHidden_weapon:{ title:"隱藏結局：成為戰爭兵器", text:"……鎮定劑濃度不足，啟動B協議。\n\nTODO：補上完整結局文字（兵器視角）。" },
+  },
+};
+
+/* 可調門檻（原文件標記 TODO 待設定，先給預設值方便測試） */
+const CONFIG = { destroyTowerStrThreshold:3, merchantChaThreshold:3 };
+
+/* =====================================================================
+ * 遊戲狀態
+ * =================================================================== */
+let state = {
+  stats: {...gameData.meta.startingStats},
+  flags: {
+    solvedDiary25:false, unlockedFloor24:false, remembersAbel:false,
+    knowsSurvivorCount:false, suspectsMirror:false, sawCarvedNames:false,
+    recalledNumber:false, hpZeroAtBoss:false, strChoicesCount:0, chaChoicesCount:0,
+  },
+  floorIndex: 0,
+  startStepIndex: 0,
+  combat: null,
+};
+
+const shaftTicksEl = document.getElementById("shaft-ticks");
+const statusbarEl = document.getElementById("statusbar");
+const contentEl = document.getElementById("content");
+
+function currentFloorKey(){ return gameData.floorOrder[state.floorIndex]; }
+
+function renderShaft(){
+  shaftTicksEl.innerHTML = "";
+  gameData.floorOrder.forEach((key, i) => {
+    const el = document.createElement("div");
+    el.className = "tick" + (i < state.floorIndex ? " done" : "") + (i === state.floorIndex ? " current" : "");
+    el.textContent = key;
+    shaftTicksEl.appendChild(el);
+  });
+}
+
+function renderStatusbar(){
+  const s = state.stats;
+  statusbarEl.innerHTML = `
+    <div class="stat">STR <b>${s.STR}</b></div>
+    <div class="stat">DEX <b>${s.DEX}</b></div>
+    <div class="stat">INT <b>${s.INT}</b></div>
+    <div class="stat">CHA <b>${s.CHA}</b></div>
+    <div class="stat hp">HP <b>${s.HP}/${s.HPMax}</b></div>
+  `;
+}
+
+function renderFlagbar(container){
+  const bar = document.createElement("div");
+  bar.id = "flagbar";
+  Object.keys(state.flags).forEach(k=>{
+    if (typeof state.flags[k] !== "boolean") return;
+    const chip = document.createElement("span");
+    chip.className = "flagchip" + (state.flags[k] ? " on" : "");
+    chip.textContent = k;
+    bar.appendChild(chip);
+  });
+  container.appendChild(bar);
+}
+
+function clearContent(){ contentEl.innerHTML = ""; }
+
+function makeEl(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function addEyebrow(container, text){
+  container.appendChild(makeEl("div","eyebrow",text));
+}
+function addTitle(container, text){
+  container.appendChild(makeEl("h1", null, text));
+}
+function addNarrative(container, text, flashback){
+  container.appendChild(makeEl("div", "narrative" + (flashback ? " flashback" : ""), text));
+}
+function addDevnote(container, text){
+  container.appendChild(makeEl("div","devnote",text));
+}
+function addPrimaryButton(container, label, onClick){
+  const b = makeEl("button","primary",label);
+  b.addEventListener("click", onClick);
+  container.appendChild(b);
+  return b;
+}
+
+function goNext(){
+  state.floorIndex++;
+  if (state.floorIndex >= gameData.floorOrder.length){
+    renderEndingChoice(); // 理論上不會走到這，B2 會導向 renderEndingChoice
+    return;
+  }
+  render();
+}
+
+function applyEffect(effect){
+  if (!effect) return;
+  Object.keys(effect).forEach(k=>{
+    if (k in state.stats) state.stats[k] += effect[k];
+    else if (k in state.flags) state.flags[k] += effect[k];
+  });
+  if (state.stats.HP > state.stats.HPMax) state.stats.HP = state.stats.HPMax;
+}
+
+function render(){
+  renderShaft();
+  renderStatusbar();
+  clearContent();
+  const key = currentFloorKey();
+
+  if (typeof key === "number"){
+    renderFloor(key);
+  } else if (key === "B1"){
+    renderB1();
+  } else if (key === "B2"){
+    renderB2();
+  }
+}
+
+/* ---------------------- 樓層渲染 ---------------------- */
+function renderFloor(key){
+  const node = gameData.floors[key];
+  addEyebrow(contentEl, `第 ${key} 層`);
+  addTitle(contentEl, node.title);
+
+  switch(node.type){
+    case "start": return renderStart(node);
+    case "puzzle_text":
+    case "puzzle_math": return renderPuzzle(node);
+    case "puzzle_text_and_potion":
+    case "puzzle_math_and_potion": return renderPuzzle(node, true);
+    case "stat_boost": return renderStatBoost(node);
+    case "stat_check": return renderStatCheck(node);
+    case "monster":
+    case "monster_and_potion": return renderMonster(node, node.type==="monster_and_potion");
+    case "boss": return renderMonster(node, false, true);
+    case "potion": return renderPotion(node);
+    default:
+      addNarrative(contentEl, node.narrative || "（此節點尚未實作）");
+      addPrimaryButton(contentEl, "繼續", goNext);
+  }
+  renderFlagbar(contentEl);
+}
+
+function renderStart(node){
+  addNarrative(contentEl, node.narrative);
+  const step = node.startSteps[state.startStepIndex];
+  if (!step){
+    addPrimaryButton(contentEl, "推開門，往下層走", () => { state.startStepIndex = 0; goNext(); });
+    return;
+  }
+  if (step.choices){
+    const box = makeEl("div"); box.id = "choices";
+    step.choices.forEach(c=>{
+      const b = makeEl("button","choice",c.label);
+      b.addEventListener("click", ()=>{
+        applyEffect(c.effect);
+        state.startStepIndex++;
+        toast(c.result);
+        render();
+      });
+      box.appendChild(b);
+    });
+    contentEl.appendChild(box);
+  } else if (step.auto){
+    applyEffect(step.auto.effect);
+    toast(step.auto.result);
+    state.startStepIndex++;
+    render();
+  }
+}
+
+let toastText = "";
+function toast(text){ toastText = text; }
+function renderToastIfAny(){
+  if (toastText){
+    const t = makeEl("div","narrative", toastText);
+    contentEl.insertBefore(t, contentEl.children[2] || null);
+    toastText = "";
+  }
+}
+
+function renderPuzzle(node, isPotionNode){
+  addNarrative(contentEl, node.narrative);
+  if (node.devnote) addDevnote(contentEl, node.devnote);
+
+  const finish = (correct) => {
+    if (node.setFlagsOnSolve) Object.assign(state.flags, node.setFlagsOnSolve);
+    if (node.resultNote) addNarrative(contentEl, node.resultNote, node.flashback);
+    if (isPotionNode) applyPotion();
+    addPrimaryButton(contentEl, correct ? "繼續" : "先繼續（可日後修正）", goNext);
+  };
+
+  if (node.options){
+    const box = makeEl("div"); box.id="choices";
+    node.options.forEach(opt=>{
+      const b = makeEl("button","choice",opt.label);
+      b.addEventListener("click", ()=>{
+        clearContent();
+        addEyebrow(contentEl, `第 ${currentFloorKey()} 層`);
+        addTitle(contentEl, node.title);
+        addNarrative(contentEl, node.narrative);
+        if (node.devnote) addDevnote(contentEl, node.devnote);
+        const correct = node.answer === "__TODO__" ? true : opt.value === node.answer;
+        addNarrative(contentEl, correct ? "✓ 答對了。" : `✗ 不太對，正確答案應為「${labelFor(node,node.answer)}」。`);
+        finish(correct);
+        renderFlagbar(contentEl);
+      });
+      box.appendChild(b);
+    });
+    contentEl.appendChild(box);
+  } else {
+    const row = makeEl("div"); row.id="textInputRow";
+    const input = document.createElement("input");
+    input.placeholder = "輸入答案…";
+    input.setAttribute("aria-label","輸入答案");
+    const btn = makeEl("button","primary","送出");
+    btn.addEventListener("click", ()=>{
+      const val = input.value.trim().toLowerCase();
+      const target = computeDynamicAnswer(node) ?? node.inputAnswer;
+      const correct = val === String(target).toLowerCase();
+      clearContent();
+      addEyebrow(contentEl, `第 ${currentFloorKey()} 層`);
+      addTitle(contentEl, node.title);
+      addNarrative(contentEl, node.narrative);
+      if (node.devnote) addDevnote(contentEl, node.devnote);
+      addNarrative(contentEl, correct ? "✓ 答對了。" : `✗ 不太對，正確答案應為「${target}」。`);
+      finish(correct);
+      renderFlagbar(contentEl);
+    });
+    row.appendChild(input); row.appendChild(btn);
+    contentEl.appendChild(row);
+  }
+  renderFlagbar(contentEl);
+}
+
+function computeDynamicAnswer(node){
+  if (!node.dynamicAnswer) return null;
+  const { base, countFlags } = node.dynamicAnswer;
+  const count = countFlags.filter(f=>state.flags[f]).length;
+  return base + count;
+}
+
+function labelFor(node, value){
+  if (!node.options) return value;
+  const found = node.options.find(o=>o.value===value);
+  return found ? found.label : value;
+}
+
+function renderStatBoost(node){
+  applyEffect(node.effect);
+  const [statName] = Object.keys(node.effect);
+  addNarrative(contentEl, node.narrative || `一座小型祭壇／培養艙，觸碰後你感到一陣輕微的記憶閃回。（${statName} +${node.effect[statName]}）`);
+  addPrimaryButton(contentEl, "繼續", goNext);
+  renderFlagbar(contentEl);
+}
+
+function renderStatCheck(node){
+  addNarrative(contentEl, node.narrative);
+  const pass = state.stats[node.checkStat] >= node.threshold;
+  const outcome = pass ? node.onSuccess : node.onFailure;
+  addNarrative(contentEl, outcome.result, pass);
+  if (pass && outcome.setFlags) Object.assign(state.flags, outcome.setFlags);
+  addPrimaryButton(contentEl, "繼續", goNext);
+  renderFlagbar(contentEl);
+}
+
+function renderPotion(node){
+  addNarrative(contentEl, "地上散落著幾瓶藥水。");
+  addPrimaryButton(contentEl, "撿起並飲用", ()=>{
+    const healed = applyPotion();
+    clearContent();
+    addEyebrow(contentEl, `第 ${currentFloorKey()} 層`);
+    addTitle(contentEl, node.title);
+    addNarrative(contentEl, `你飲下藥水，回復了 ${healed} 點血量。`);
+    addPrimaryButton(contentEl, "繼續", goNext);
+    renderFlagbar(contentEl);
+  });
+  renderFlagbar(contentEl);
+}
+
+function applyPotion(){
+  const isLarge = Math.random() < 0.5;
+  const heal = isLarge ? rand(6,9) : rand(3,5);
+  state.stats.HP = Math.min(state.stats.HPMax, state.stats.HP + heal);
+  return heal;
+}
+
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+/* ---------------------- 戰鬥 ---------------------- */
+function renderMonster(node, alsoGivesPotion, isBoss){
+  const mon = gameData.monsters[node.monsterId];
+  if (!state.combat || state.combat.monsterId !== node.monsterId){
+    state.combat = { monsterId: node.monsterId, hp: mon.hp, log: [] };
+  }
+  if (node.narrative) addNarrative(contentEl, node.narrative);
+  if (node.requiresFlag && !state.flags[node.requiresFlag]){
+    addNarrative(contentEl, "（此密室尚未解鎖，理論上不應出現在此流程中）");
+  }
+
+  const combat = state.combat;
+  const wrap = makeEl("div","hpbars");
+  wrap.innerHTML = `
+    <div>
+      <div class="hpbar-label"><span>${mon.name}</span><span>${Math.max(combat.hp,0)}/${mon.hp}</span></div>
+      <div class="hpbar-track"><div class="hpbar-fill" style="width:${Math.max(combat.hp,0)/mon.hp*100}%"></div></div>
+    </div>
+    <div>
+      <div class="hpbar-label"><span>你</span><span>${Math.max(state.stats.HP,0)}/${state.stats.HPMax}</span></div>
+      <div class="hpbar-track"><div class="hpbar-fill player" style="width:${Math.max(state.stats.HP,0)/state.stats.HPMax*100}%"></div></div>
+    </div>
+  `;
+  contentEl.appendChild(wrap);
+
+  if (combat.hp > 0 && state.stats.HP > 0){
+    addPrimaryButton(contentEl, "攻擊", ()=>{
+      const dmgToMonster = rand(state.stats.STR, state.stats.STR + 10);
+      combat.hp -= dmgToMonster;
+      combat.log.unshift(`你造成 ${dmgToMonster} 點傷害。`);
+      if (combat.hp > 0){
+        const [lo,hi] = mon.atkRange;
+        const dmgToPlayer = rand(lo,hi);
+        state.stats.HP -= dmgToPlayer;
+        combat.log.unshift(`${mon.name} 反擊，你受到 ${dmgToPlayer} 點傷害。`);
+      }
+      if (state.stats.HP <= 0 && isBoss){
+        state.flags.hpZeroAtBoss = true;
+        renderEnding("endingHidden_weapon");
+        return;
+      } else if (state.stats.HP <= 0){
+        state.stats.HP = 1; // 一般戰鬥不做真正死亡結局，避免卡關
+        combat.log.unshift("你撐住了最後一口氣。");
+      }
+      render();
+      renderCombatLog(combat.log);
+    });
+  } else if (combat.hp <= 0){
+    addNarrative(contentEl, `擊敗了 ${mon.name}。`);
+    if (alsoGivesPotion){
+      addPrimaryButton(contentEl, "撿取藥水並繼續", ()=>{ applyPotion(); state.combat=null; goNext(); });
+    } else {
+      addPrimaryButton(contentEl, "繼續", ()=>{ state.combat=null; goNext(); });
+    }
+  }
+  renderCombatLog(combat.log);
+  renderFlagbar(contentEl);
+}
+
+function renderCombatLog(log){
+  const old = document.getElementById("log");
+  if (old) old.remove();
+  const box = makeEl("div"); box.id="log";
+  log.slice(0,6).forEach(line=>box.appendChild(makeEl("div",null,line)));
+  contentEl.appendChild(box);
+}
+
+/* ---------------------- 地下層 ---------------------- */
+function renderB1(){
+  const node = gameData.underground.B1;
+  addEyebrow(contentEl,"地下一層");
+  addTitle(contentEl, node.title);
+  const count = node.requiresFlags.filter(f=>state.flags[f]).length;
+  const full = count >= node.minCount;
+  addNarrative(contentEl, full ? node.fullText : node.partialText, full);
+  addNarrative(contentEl, `（已收集線索旗標：${count} / ${node.requiresFlags.length}，需滿足 ${node.minCount} 個才能觸發完整檔案）`);
+  state.flags.b1FullArchiveTriggered = full;
+  addPrimaryButton(contentEl, "前往地下二層", goNext);
+  renderFlagbar(contentEl);
+}
+
+function renderB2(){
+  const node = gameData.underground.B2;
+  addEyebrow(contentEl,"地下二層");
+  addTitle(contentEl, node.title);
+  addNarrative(contentEl, node.narrative);
+
+  const trueEndingAvailable = state.flags.b1FullArchiveTriggered;
+  const choices = [
+    { key:"ending1_destroyTower", label:"引爆核心，摧毀高塔",
+      enabled: state.stats.strChoicesCount === undefined ? true : true, note:`(建議門檻 STR偏向選擇 ≥ ${CONFIG.destroyTowerStrThreshold} 次，此原型不強制限制)` },
+    { key:"ending2_cloneResearch", label:"潛入研究室帶走複製人資料",
+      enabled: state.flags.suspectsMirror, note: state.flags.suspectsMirror ? "" : "（需先在 floor11 解開鏡子謎題）" },
+    { key:"ending3_villageScholar", label:"直接離開高塔前往最近村莊", enabled:true, note:"（無門檻）" },
+    { key:"ending4_merchant", label:"循著補給路線去找商隊", enabled:true, note:"（建議門檻 CHA 相關，此原型不強制限制）" },
+  ];
+  if (trueEndingAvailable){
+    choices.push({ key:"endingTrue_revealed", label:"（隱藏選項）追問到底 —— 真結局", enabled:true, note:"" });
+  }
+
+  const box = makeEl("div"); box.id="choices";
+  choices.forEach(c=>{
+    const b = makeEl("button","choice", c.label + (c.note?`  ${c.note}`:""));
+    b.disabled = !c.enabled;
+    if (!c.enabled) b.style.opacity = 0.4;
+    b.addEventListener("click", ()=>renderEnding(c.key));
+    box.appendChild(b);
+  });
+  contentEl.appendChild(box);
+  renderFlagbar(contentEl);
+}
+
+function renderEnding(key){
+  clearContent();
+  const ending = gameData.endings[key];
+  addEyebrow(contentEl,"結局");
+  addTitle(contentEl, ending.title);
+  addNarrative(contentEl, ending.text, true);
+  addPrimaryButton(contentEl, "重新開始", restart);
+  renderFlagbar(contentEl);
+  const ticks = shaftTicksEl.querySelectorAll(".tick");
+  ticks.forEach(t=>t.classList.add("done"));
+}
+
+function restart(){
+  state = {
+    stats: {...gameData.meta.startingStats},
+    flags: {
+      solvedDiary25:false, unlockedFloor24:false, remembersAbel:false,
+      knowsSurvivorCount:false, suspectsMirror:false, sawCarvedNames:false,
+      recalledNumber:false, hpZeroAtBoss:false, strChoicesCount:0, chaChoicesCount:0,
+    },
+    floorIndex: 0, startStepIndex: 0, combat: null,
+  };
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
