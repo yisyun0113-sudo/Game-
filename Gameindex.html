@@ -1,593 +1,1401 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>互動小遊戲</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Antique&display=swap');
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高塔迴聲</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Noto Serif TC', 'Songti SC', serif;
+      padding: 16px;
+    }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ══════════════════════════════════════
+       開頭畫面
+    ══════════════════════════════════════ */
+    #title-screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 40%, #1a1a22 0%, #060608 70%);
+      z-index: 100;
+      transition: opacity 0.8s ease;
+    }
+    #title-screen.hidden { opacity: 0; pointer-events: none; }
+    #title-screen::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 75% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 40% 60%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 45%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 80%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 60% 30%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 85% 75%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5%  55%, rgba(255,255,255,0.5) 0%, transparent 100%);
+    }
+    #title-emblem { font-size: 72px; margin-bottom: 24px; filter: drop-shadow(0 0 40px rgba(150,180,180,0.5)); animation: float 3s ease-in-out infinite; z-index:1; }
+    #title-main { font-size: clamp(28px,6vw,48px); font-weight:700; color:#fff; letter-spacing:8px; text-align:center; text-shadow: 0 0 20px rgba(150,180,180,0.8), 0 0 60px rgba(90,120,120,0.4); z-index:1; margin-bottom:10px; animation: fadeUp 1s ease both; }
+    #title-sub { font-size:13px; color:rgba(180,200,200,0.5); letter-spacing:4px; z-index:1; margin-bottom:56px; animation: fadeUp 1s 0.2s ease both; }
+    #start-btn {
+      z-index:1; background:transparent; border:1px solid rgba(180,200,200,0.4);
+      color:rgba(200,220,220,0.9); font-family:inherit; font-size:15px; letter-spacing:5px;
+      padding:14px 48px; border-radius:40px; cursor:pointer;
+      transition: all 0.3s ease; animation: fadeUp 1s 0.4s ease both;
+    }
+    #start-btn:hover { border-color:rgba(180,200,200,0.8); color:#fff; box-shadow:0 0 24px rgba(120,150,150,0.3); transform:translateY(-2px); }
+    #title-footer { position:absolute; bottom:24px; color:rgba(255,255,255,0.15); font-size:11px; letter-spacing:2px; z-index:1; }
 
-  :root {
-    --bg: #0d0a14;
-    --panel: rgba(15, 10, 30, 0.92);
-    --border: rgba(180, 140, 255, 0.25);
-    --accent: #c49bff;
-    --accent2: #ff9bce;
-    --text: #e8deff;
-    --dim: #8a7aaa;
-    --choice-bg: rgba(100, 60, 180, 0.15);
-    --choice-hover: rgba(140, 90, 240, 0.3);
-  }
+    /* ══════════════════════════════════════
+       主遊戲框
+    ══════════════════════════════════════ */
+    #app { width:100%; max-width:760px; border-radius:16px; overflow:hidden; box-shadow:0 0 80px rgba(0,0,0,0.9); border:1px solid rgba(255,255,255,0.08); }
 
-  body {
-    font-family: 'Noto Serif TC', serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
+    /* 場景 */
+    #scene { height:280px; position:relative; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; transition:background 0.8s ease; }
+    #scene-overlay { position:absolute; inset:0; background:radial-gradient(ellipse at 50% 80%, rgba(255,255,255,0.04) 0%, transparent 70%); pointer-events:none; }
+    #bg-char { font-size:90px; filter:drop-shadow(0 0 30px rgba(255,255,255,0.2)); z-index:1; transition:opacity 0.4s ease; display:flex; align-items:center; justify-content:center; }
+    #bg-char img { object-fit:contain; filter:drop-shadow(0 0 20px rgba(255,255,255,0.15)); transition:opacity 0.4s ease; }
+    #scene-label { position:absolute; top:12px; left:16px; background:rgba(0,0,0,0.5); backdrop-filter:blur(8px); padding:4px 12px; border-radius:20px; color:rgba(255,255,255,0.6); font-size:12px; letter-spacing:1px; border:1px solid rgba(255,255,255,0.1); z-index:2; }
+    #click-hint { position:absolute; bottom:14px; right:18px; color:rgba(255,255,255,0.4); font-size:12px; animation:blink 1.2s infinite; z-index:2; }
 
-  /* ── 背景 ── */
-  #scene-bg {
-    position: fixed;
-    inset: 0;
-    background: #1a0a2e;
-    transition: background 1.2s ease;
-    z-index: 0;
-  }
-  #scene-bg::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(120,60,200,0.3) 0%, transparent 70%);
-  }
+    /* 對話框 */
+    #dialog { background:rgba(8,8,16,0.97); padding:20px 24px 24px; transition:opacity 0.3s ease; position:relative; }
+    #char-name { font-size:14px; font-weight:700; letter-spacing:3px; margin-bottom:10px; }
+    #dialog-text { color:rgba(220,220,235,0.92); font-size:16px; line-height:1.9; min-height:56px; letter-spacing:0.5px; cursor:pointer; white-space:pre-line; }
+    #cursor { opacity:0.5; animation:blink 0.7s infinite; display:none; }
+    #choices { margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+    .choice-btn { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:rgba(200,200,220,0.9); padding:12px 18px; text-align:left; font-size:15px; cursor:pointer; transition:all 0.2s; font-family:inherit; letter-spacing:0.4px; line-height:1.5; }
+    .choice-btn:hover { background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.35); transform:translateX(4px); }
+    .choice-index { color:rgba(255,255,255,0.3); margin-right:10px; font-size:12px; }
 
-  /* ── 星星粒子 ── */
-  .stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-  .star {
-    position: absolute;
-    border-radius: 50%;
-    background: white;
-    animation: twinkle linear infinite;
-  }
-  @keyframes twinkle {
-    0%,100% { opacity: 0.1; } 50% { opacity: 0.9; }
-  }
+    /* 文字輸入框 */
+    .text-input-wrap { display:flex; gap:10px; align-items:stretch; }
+    .text-input-field {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      color: rgba(220,220,235,0.92);
+      font-family: inherit;
+      font-size: 15px;
+      padding: 12px 16px;
+      outline: none;
+      letter-spacing: 0.4px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .text-input-field::placeholder { color: rgba(255,255,255,0.2); }
+    .text-input-field:focus { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.07); }
+    .text-input-send {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      color: rgba(200,200,220,0.9);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 12px 20px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .text-input-send:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.35); }
+    .text-input-hint { font-size:12px; color:rgba(255,255,255,0.2); margin-top:6px; letter-spacing:0.5px; }
 
-  /* ── 遊戲容器 ── */
-  #game {
-    position: relative;
-    z-index: 10;
-    width: min(720px, 95vw);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+    /* 結局 */
+    #ending { margin-top:20px; text-align:center; padding:16px 0 4px; border-top:1px solid rgba(255,255,255,0.08); display:none; }
+    #ending-label { color:rgba(255,255,255,0.4); font-size:13px; letter-spacing:2px; margin-bottom:14px; }
+    #restart-btn { background:transparent; border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.7); padding:10px 28px; border-radius:6px; cursor:pointer; font-size:14px; letter-spacing:2px; font-family:inherit; transition:all 0.2s; }
+    #restart-btn:hover { background:rgba(255,255,255,0.08); }
 
-  /* ── 場景標籤 ── */
-  #scene-label {
-    font-size: 11px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--dim);
-    text-align: right;
-    padding-right: 4px;
-    min-height: 16px;
-    transition: opacity 0.5s;
-  }
+    /* ══════════════════════════════════════
+       戰鬥畫面
+    ══════════════════════════════════════ */
+    #battle-screen {
+      display: none;
+      flex-direction: column;
+      background: rgba(8,8,16,0.97);
+    }
 
-  /* ── 角色立繪區 ── */
-  #character-area {
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    height: 120px;
-    position: relative;
-  }
-  #character-sprite {
-    font-size: 90px;
-    line-height: 1;
-    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.4s;
-    filter: drop-shadow(0 0 20px rgba(180,140,255,0.5));
-  }
-  #character-sprite.shake {
-    animation: shake 0.5s ease;
-  }
-  @keyframes shake {
-    0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
-  }
+    #battle-stage {
+      height: 280px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      overflow: hidden;
+      transition: background 0.6s ease;
+    }
 
-  /* ── 對話框 ── */
-  #dialog-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px 28px;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 0 60px rgba(100,60,200,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
-    position: relative;
-    min-height: 110px;
-  }
-  #speaker-name {
-    font-size: 13px;
-    letter-spacing: 2px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 10px;
-    min-height: 18px;
-  }
-  #dialog-text {
-    font-size: 17px;
-    line-height: 1.85;
-    color: var(--text);
-  }
-  /* 打字游標 */
-  #cursor {
-    display: inline-block;
-    width: 2px;
-    height: 1em;
-    background: var(--accent);
-    margin-left: 2px;
-    vertical-align: middle;
-    animation: blink 0.8s step-end infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .combatant { display:flex; flex-direction:column; align-items:center; gap:10px; z-index:2; }
+    .combatant-sprite { font-size:72px; transition:transform 0.15s ease; display:block; }
+    .combatant-sprite.shake        { animation: shake       0.4s ease; }
+    .combatant-sprite.attack-right { animation: attackRight 0.4s ease; }
+    .combatant-sprite.attack-left  { animation: attackLeft  0.4s ease; }
+    .combatant-name { font-size:13px; letter-spacing:2px; color:rgba(255,255,255,0.7); }
 
-  /* 繼續提示 */
-  #continue-hint {
-    position: absolute;
-    bottom: 14px;
-    right: 20px;
-    font-size: 12px;
-    color: var(--dim);
-    animation: float 1.5s ease-in-out infinite;
-    cursor: pointer;
-    display: none;
-  }
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    .hp-bar-wrap { width:120px; background:rgba(255,255,255,0.08); border-radius:99px; height:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); }
+    .hp-bar { height:100%; border-radius:99px; transition:width 0.4s ease, background 0.4s ease; }
+    .hp-bar.green  { background: linear-gradient(90deg, #3ecf6a, #6dffaa); }
+    .hp-bar.yellow { background: linear-gradient(90deg, #cfb03e, #ffe56d); }
+    .hp-bar.red    { background: linear-gradient(90deg, #cf3e3e, #ff6d6d); }
+    .hp-text { font-size:11px; color:rgba(255,255,255,0.4); letter-spacing:1px; }
 
-  /* ── 選項區 ── */
-  #choices {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    transition: opacity 0.4s;
-  }
-  .choice-btn {
-    background: var(--choice-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 20px;
-    font-family: 'Noto Serif TC', serif;
-    font-size: 15px;
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    position: relative;
-    overflow: hidden;
-  }
-  .choice-btn::before {
-    content: '▸';
-    color: var(--accent);
-    margin-right: 10px;
-    transition: transform 0.2s;
-    display: inline-block;
-  }
-  .choice-btn:hover {
-    background: var(--choice-hover);
-    border-color: rgba(180,140,255,0.5);
-    transform: translateX(4px);
-  }
-  .choice-btn:hover::before { transform: translateX(3px); }
-  .choice-btn:active { transform: translateX(2px) scale(0.99); }
+    #battle-vs { font-size:28px; font-weight:700; color:rgba(255,255,255,0.12); letter-spacing:4px; z-index:1; }
 
-  /* ── 結局畫面 ── */
-  #ending-screen {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    background: rgba(5,2,12,0.95);
-    backdrop-filter: blur(10px);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 20px;
-    animation: fadeIn 1s ease;
-  }
-  #ending-screen.show { display: flex; }
-  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  #ending-title {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 4px;
-  }
-  #ending-text {
-    font-size: 17px;
-    color: var(--dim);
-    max-width: 400px;
-    line-height: 1.9;
-  }
-  #restart-btn {
-    margin-top: 12px;
-    background: transparent;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-family: 'Noto Serif TC', serif;
-    font-size: 14px;
-    letter-spacing: 2px;
-    padding: 12px 32px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-  }
-  #restart-btn:hover { background: var(--accent); color: var(--bg); }
+    #battle-log-area {
+      background: rgba(0,0,0,0.4);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 12px 20px;
+      min-height: 50px;
+      font-size: 14px;
+      color: rgba(200,200,220,0.85);
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+    }
 
-  /* 進度條 */
-  #progress-bar {
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 2px;
-    transition: width 0.6s ease;
-    align-self: flex-start;
-  }
-</style>
+    #battle-actions { padding:16px 20px 20px; display:flex; flex-direction:column; gap:10px; }
+
+    #item-bar { display:flex; gap:8px; margin-bottom:4px; }
+    .item-btn {
+      background:rgba(255,200,80,0.08); border:1px solid rgba(255,200,80,0.25);
+      border-radius:8px; color:rgba(255,220,120,0.9); padding:7px 14px;
+      font-size:13px; cursor:pointer; font-family:inherit; transition:all 0.2s;
+      display:flex; align-items:center; gap:6px;
+    }
+    .item-btn:hover:not(:disabled) { background:rgba(255,200,80,0.18); border-color:rgba(255,200,80,0.5); }
+    .item-btn:disabled { opacity:0.3; cursor:default; }
+    .item-count { font-size:11px; opacity:0.6; }
+
+    #action-btns { display:flex; gap:10px; flex-wrap:wrap; }
+    .action-btn {
+      flex:1; min-width:100px; padding:12px 10px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04);
+      color:rgba(200,200,220,0.9); font-size:14px; font-family:inherit;
+      letter-spacing:1px; cursor:pointer; transition:all 0.2s;
+    }
+    .action-btn:hover:not(:disabled) { background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.35); transform:translateY(-2px); }
+    .action-btn:disabled { opacity:0.3; cursor:default; transform:none; }
+    .action-btn.attack { border-color:rgba(255,100,100,0.4); color:rgba(255,160,160,0.9); }
+    .action-btn.attack:hover:not(:disabled) { background:rgba(255,100,100,0.12); border-color:rgba(255,100,100,0.7); }
+    .action-btn.flee { border-color:rgba(150,150,255,0.4); color:rgba(180,180,255,0.9); }
+    .action-btn.flee:hover:not(:disabled) { background:rgba(150,150,255,0.12); border-color:rgba(150,150,255,0.7); }
+
+    .dmg-popup {
+      position:absolute; font-size:22px; font-weight:700;
+      pointer-events:none; animation:popUp 0.9s ease forwards; z-index:10;
+    }
+    .dmg-popup.enemy  { color:#ff7070; text-shadow:0 0 10px rgba(255,80,80,0.7); }
+    .dmg-popup.player { color:#ffd060; text-shadow:0 0 10px rgba(255,200,60,0.7); }
+    .dmg-popup.heal   { color:#60ff90; text-shadow:0 0 10px rgba(60,255,100,0.7); }
+
+    /* ══════════════════════════════════════
+       Animations
+    ══════════════════════════════════════ */
+    @keyframes blink       { 0%,100%{opacity:1} 50%{opacity:0} }
+    @keyframes float       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    @keyframes fadeUp      { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes shake       { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+    @keyframes attackRight { 0%,100%{transform:translateX(0)} 40%{transform:translateX(30px)} }
+    @keyframes attackLeft  { 0%,100%{transform:translateX(0)} 40%{transform:translateX(-30px)} }
+    @keyframes popUp       { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-50px)} }
+
+    /* 數值變化提示 */
+    .stat-toast {
+      position: absolute;
+      top: -10px;
+      right: 20px;
+      background: rgba(10,10,20,0.92);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      color: rgba(220,220,255,0.9);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .stat-toast.show { opacity: 1; transform: translateY(0); }
+
+    /* 樓層旗標小面板（★新增，僅供你開發測試用，正式上線可整段刪除） */
+    #debug-flags {
+      position: fixed; top: 8px; left: 8px; z-index: 200;
+      background: rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.15);
+      border-radius:6px; padding:6px 10px; font-size:10px; color:rgba(255,255,255,0.5);
+      max-width:220px; line-height:1.6; letter-spacing:0.5px; display:none;
+    }
+  </style>
 </head>
 <body>
 
-<div id="scene-bg"></div>
-<div class="stars" id="stars"></div>
-
-<div id="game">
-  <div id="scene-label"></div>
-  <div id="progress-bar" style="width:0%"></div>
-  <div id="character-area">
-    <div id="character-sprite"></div>
-  </div>
-  <div id="dialog-box">
-    <div id="speaker-name"></div>
-    <div id="dialog-text"></div>
-    <div id="continue-hint">點擊繼續 ▾</div>
-  </div>
-  <div id="choices"></div>
+<!-- ══════════════════════════════════════
+  🎮 【可修改區域 0】開頭畫面
+══════════════════════════════════════ -->
+<div id="title-screen">
+  <div id="title-emblem">🗼</div>
+  <div id="title-main">高塔迴聲</div>
+  <div id="title-sub">ECHOES OF THE TOWER</div>
+  <button id="start-btn" onclick="startGame()">▶ &nbsp; 開 始 遊 戲</button>
+  <div id="title-footer">© 2026 Your Name</div>
 </div>
 
-<div id="ending-screen">
-  <div id="ending-title"></div>
-  <div id="ending-text"></div>
-  <button id="restart-btn" onclick="startGame()">↺ 再玩一次</button>
+<div id="debug-flags"></div>
+
+<div id="app">
+  <!-- 劇情畫面 -->
+  <div id="story-screen">
+    <div id="scene">
+      <div id="scene-overlay"></div>
+      <div id="bg-char"></div>
+      <div id="scene-label"></div>
+      <div id="click-hint" style="display:none">▶ 點擊繼續</div>
+    </div>
+    <div id="dialog">
+      <div id="char-name"></div>
+      <div id="dialog-text"><span id="text-content"></span><span id="cursor">▌</span></div>
+      <div id="choices"></div>
+      <div id="ending">
+        <div id="ending-label">── END ──</div>
+        <button id="restart-btn" onclick="restart()">↩ 重新開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚔️ 戰鬥畫面 -->
+  <div id="battle-screen">
+    <div id="battle-stage">
+      <div class="combatant" id="player-side">
+        <div class="combatant-sprite" id="player-sprite">🧍</div>
+        <div class="combatant-name"  id="player-name">實驗體07</div>
+        <div class="hp-bar-wrap"><div class="hp-bar green" id="player-hp-bar" style="width:100%"></div></div>
+        <div class="hp-text" id="player-hp-text">100 / 100</div>
+      </div>
+      <div id="battle-vs">VS</div>
+      <div class="combatant" id="enemy-side">
+        <div class="combatant-sprite" id="enemy-sprite">👹</div>
+        <div class="combatant-name"  id="enemy-name">敵人</div>
+        <div class="hp-bar-wrap"><div class="hp-bar green" id="enemy-hp-bar" style="width:100%"></div></div>
+        <div class="hp-text" id="enemy-hp-text">80 / 80</div>
+      </div>
+    </div>
+
+    <div id="battle-log-area">⚔️ 戰鬥開始！</div>
+
+    <div id="battle-actions">
+      <div id="item-bar">
+        <button class="item-btn" id="potion-btn" onclick="useItem('potion')">
+          🧪 回復藥水 <span class="item-count" id="potion-count">×2</span>
+        </button>
+      </div>
+      <div id="action-btns">
+        <button class="action-btn attack" onclick="playerAction('attack')">⚔️ 攻擊</button>
+        <button class="action-btn attack" onclick="playerAction('heavy')">💥 重擊</button>
+        <button class="action-btn flee"   onclick="playerAction('flee')">💨 逃跑</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════
-//   🎨 劇情資料 ── 在這裡自訂你的故事！
-// ═══════════════════════════════════════════════
-
-const STORY = {
-
-  // ── 場景定義 ──────────────────────────────────
-  // 每個場景有唯一 ID，包含：
-  //   scene   : 顯示在右上角的場景名稱（可選）
-  //   bg      : 背景顏色（CSS 顏色值，可選）
-  //   sprite  : 角色表情 emoji（可選）
-  //   speaker : 說話者姓名（空字串 = 旁白）
-  //   text    : 對話內容
-  //   next    : 下一幕 ID（若無選項）
-  //   choices : 選項陣列 [{ text, next }, ...]
-  //   ending  : true 代表結局（會觸發結局畫面）
-  //   endTitle: 結局標題
-  //   endText : 結局說明
-
-  scenes: {
-
-    // ── 開場 ──
-    "start": {
-      scene: "黎明前的廣場",
-      bg: "#0d0820",
-      sprite: "🌙",
-      speaker: "",
-      text: "月色淡薄，廣場上只剩一盞搖曳的燈。一個身影從暗處走來——",
-      next: "intro_1"
-    },
-
-    "intro_1": {
-      sprite: "🧙",
-      speaker: "神秘旅者",
-      text: "你好，旅人。我等你很久了。",
-      next: "intro_2"
-    },
-
-    "intro_2": {
-      sprite: "🧙",
-      speaker: "神秘旅者",
-      text: "傳說中的遺跡就在北方。你願意和我一同前往嗎？",
-      choices: [
-        { text: "「我願意，出發吧！」", next: "accept" },
-        { text: "「你到底是誰？先說清楚。」", next: "ask_who" },
-        { text: "「我不感興趣。」", next: "refuse" }
-      ]
-    },
-
-    // ── 分支 A：接受 ──
-    "accept": {
-      scene: "通往北方的山道",
-      bg: "#0a1a20",
-      sprite: "🧙",
-      speaker: "神秘旅者",
-      text: "很好。你的勇氣令我欣慰。路上我來告訴你遺跡的秘密……",
-      next: "journey"
-    },
-
-    "journey": {
-      sprite: "🌄",
-      speaker: "",
-      text: "兩人沿著山道一路北行，晨光漸漸染紅天際。遠處，遺跡的輪廓若隱若現。",
-      next: "ruin_gate"
-    },
-
-    // ── 分支 B：詢問身份 ──
-    "ask_who": {
-      sprite: "🧙",
-      speaker: "神秘旅者",
-      text: "哈……問得好。我叫 Elan，是遺跡的守護者後裔。而你，也許是被命運選中的人。",
-      next: "ask_who_2"
-    },
-
-    "ask_who_2": {
-      sprite: "🧙",
-      speaker: "Elan",
-      text: "現在你願意跟我走了嗎？",
-      choices: [
-        { text: "「好，帶路吧。」", next: "accept" },
-        { text: "「還是算了。」", next: "refuse" }
-      ]
-    },
-
-    // ── 分支 C：拒絕 ──
-    "refuse": {
-      scene: "廣場一角",
-      bg: "#140a0a",
-      sprite: "🧙",
-      speaker: "Elan",
-      text: "那……也許緣分未到。若你改變心意，我會在北方等你。",
-      next: "refuse_end"
-    },
-
-    "refuse_end": {
-      sprite: "🌙",
-      speaker: "",
-      text: "旅者轉身消失在夜色中。你獨自留在廣場，不知道自己錯過了什麼。",
-      ending: true,
-      endTitle: "孤獨的終點",
-      endText: "也許有些門，一旦關上就不再開啟。\n\n這是結局 C：拒絕同行。"
-    },
-
-    // ── 遺跡入口 ──
-    "ruin_gate": {
-      scene: "遺跡大門前",
-      bg: "#0a1a10",
-      sprite: "🏛️",
-      speaker: "",
-      text: "巨大的石門刻滿古老符文，中央有三個凹槽，分別散發著不同光芒。",
-      next: "ruin_choice"
-    },
-
-    "ruin_choice": {
-      sprite: "🧙",
-      speaker: "Elan",
-      text: "傳說石門只回應純粹的意志。你的選擇，將決定遺跡開啟的方式。",
-      choices: [
-        { text: "觸碰閃著金光的符文（智慧之門）", next: "end_wisdom" },
-        { text: "觸碰閃著紅光的符文（勇氣之門）", next: "end_courage" },
-        { text: "觸碰閃著藍光的符文（命運之門）", next: "end_fate" }
-      ]
-    },
-
-    // ── 結局 A ──
-    "end_wisdom": {
-      ending: true,
-      endTitle: "智慧的傳承",
-      endText: "金光大盛，石門緩緩開啟。\n古老的知識如洪流湧入你的心智。\n\n你成為了下一代守護者。\n\n🏆 結局 A：智者之路"
-    },
-
-    // ── 結局 B ──
-    "end_courage": {
-      ending: true,
-      endTitle: "勇者的試煉",
-      endText: "紅光如火焰迸發，遺跡深處傳來怒吼。\n你握緊拳頭，踏入黑暗——\n\n無論前方是什麼，你都不再退縮。\n\n⚔️ 結局 B：勇者之路"
-    },
-
-    // ── 結局 C ──
-    "end_fate": {
-      ending: true,
-      endTitle: "命運的回響",
-      endText: "藍光將你包裹，時間彷彿靜止。\nElan 低聲說：「原來是你……」\n\n一切謎題，在此揭曉。\n\n✨ 結局 D：命運之路"
-    }
-
-  },
-
-  // ── 起始場景 ID ──
-  startScene: "start",
-
-  // ── 進度計算（可選：填入關鍵場景 ID，用於進度條）──
-  milestones: ["start", "intro_2", "ruin_gate", "ruin_choice"]
-
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 1】角色設定                                 ║
+// ╚══════════════════════════════════════════════════════════════╝
+const CHARACTERS = {
+  narrator: { name: "旁白",   color: "#9aa5ad" },
+  echo:     { name: "？？？", color: "#c9973f" }, // 用於守望者/異常記憶片段的台詞
 };
 
-// ═══════════════════════════════════════════════
-//   ⚙️ 遊戲引擎（不需要修改）
-// ═══════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 2】場景設定                                 ║
+// ║  依樓層區段分成四種場景基調，可自行改成每層獨立場景            ║
+// ╚══════════════════════════════════════════════════════════════╝
+const SCENES = {
+  tower_top: {
+    bg: "linear-gradient(180deg, #0d0f12 0%, #1b2028 45%, #0d0f12 100%)",
+    label: "🗼 高塔上層",
+  },
+  tower_mid: {
+    bg: "linear-gradient(180deg, #0d1012 0%, #182228 45%, #0d1012 100%)",
+    label: "🗼 高塔中層",
+  },
+  tower_lower: {
+    bg: "linear-gradient(180deg, #0c0e10 0%, #14181d 45%, #0c0e10 100%)",
+    label: "🗼 高塔下層",
+  },
+  boss_hall: {
+    bg: "linear-gradient(180deg, #0a0a0a 0%, #241010 45%, #0a0a0a 100%)",
+    label: "⚔ 塔底決戰",
+  },
+  archive: {
+    bg: "linear-gradient(180deg, #0a0c0e 0%, #1a1712 45%, #0a0c0e 100%)",
+    label: "📁 地下一層・檔案室",
+  },
+  core: {
+    bg: "linear-gradient(180deg, #06080a 0%, #10181a 45%, #06080a 100%)",
+    label: "🖥 地下二層・核心控制室",
+  },
+};
 
-let currentScene = null;
-let isTyping = false;
-let typeTimer = null;
-let fullText = "";
-let shownText = "";
-const TYPING_SPEED = 40; // ms per character
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 3】主角戰鬥數值                             ║
+// ║  hp        : 最大血量                                        ║
+// ║  atk       : 普通攻擊傷害 [最小, 最大]                       ║
+// ║  heavy     : 重擊傷害 [最小, 最大]（25% 機率失手）            ║
+// ║  potionHeal: 戰鬥中使用道具藥水的回復量                       ║
+// ║  items     : 初始道具數量                                    ║
+// ╚══════════════════════════════════════════════════════════════╝
+const PLAYER_BASE = {
+  name:       "實驗體07",
+  sprite:     "🧍",
+  hp:         200,
+  atk:        [8, 14],
+  heavy:      [16, 26],
+  potionHeal: 6,
+  items:      { potion: 2 },
+};
 
-const elBg = document.getElementById('scene-bg');
-const elLabel = document.getElementById('scene-label');
-const elSprite = document.getElementById('character-sprite');
-const elSpeaker = document.getElementById('speaker-name');
-const elDialog = document.getElementById('dialog-text');
-const elChoices = document.getElementById('choices');
-const elHint = document.getElementById('continue-hint');
-const elEnding = document.getElementById('ending-screen');
-const elEndTitle = document.getElementById('ending-title');
-const elEndText = document.getElementById('ending-text');
-const elProgress = document.getElementById('progress-bar');
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 3-1】★新增：主角四維屬性（原模板沒有）       ║
+// ║  STR/DEX/INT/CHA，對應劇本設定，初始各 5 點                  ║
+// ║  目前僅 STR（連動 atk）與 INT（floor7 判定）有掛勾遊戲機制，   ║
+// ║  DEX / CHA 尚未接上任何機制，請依你的設計自行擴充：            ║
+// ║  TODO：DEX 是否影響閃避／逃跑成功率？CHA 是否影響結局門檻？    ║
+// ╚══════════════════════════════════════════════════════════════╝
+const STATS = { STR: 5, DEX: 5, INT: 5, CHA: 5 };
 
-// 生成星星
-function makeStars() {
-  const container = document.getElementById('stars');
-  for (let i = 0; i < 80; i++) {
-    const s = document.createElement('div');
-    s.className = 'star';
-    const size = Math.random() * 2 + 0.5;
-    s.style.cssText = `
-      width:${size}px; height:${size}px;
-      left:${Math.random()*100}%;
-      top:${Math.random()*100}%;
-      animation-duration:${2+Math.random()*4}s;
-      animation-delay:${Math.random()*4}s;
-    `;
-    container.appendChild(s);
-  }
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 3-2】★新增：旗標系統（原模板沒有）           ║
+// ║  用來記錄玩家是否解開特定線索，影響地下一層檔案完整度、        ║
+// ║  地下二層可選結局、以及 floor2 的動態答案                     ║
+// ╚══════════════════════════════════════════════════════════════╝
+const FLAGS = {
+  solvedDiary25: false,
+  unlockedFloor24: false,
+  remembersAbel: false,
+  knowsSurvivorCount: false,
+  suspectsMirror: false,
+  exploredMirrorDeep: false,
+  sawCarvedNames: false,
+  recalledNumber: false,
+  hpZeroAtBoss: false,
+  b1FullArchiveTriggered: false,
+};
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 4】敵人資料表                               ║
+// ║  在 STORY 節點中用 battle:"id" 觸發對應敵人                  ║
+// ║  onWin  → 勝利後跳到的劇情節點                              ║
+// ║  onLose → 失敗後跳到的劇情節點                              ║
+// ║  ★設計說明：除了 BOSS 之外，一般怪物的 onLose 都指向失敗結局   ║
+// ║  節點（9007），戰敗即結束遊戲。若想讓某隻怪失敗後有不同的      ║
+// ║  專屬結局文字，把它的 onLose 改成別的節點 id（記得也要在下面   ║
+// ║  的結局區塊新增對應節點）即可。                                ║
+// ╚══════════════════════════════════════════════════════════════╝
+const ENEMIES = {
+  "C-93": { name:"三頭犬 C-93",         sprite:"🐕", hp:110, atk:[10,16], bg:"linear-gradient(180deg,#150a08 0%,#3a1c10 50%,#150a08 100%)", onWin:2801, onLose:9007 },
+  "W-12": { name:"狼人 W-12",           sprite:"🐺", hp:130, atk:[11,18], bg:"linear-gradient(180deg,#0a0f14 0%,#1c2a30 50%,#0a0f14 100%)", onWin:2401, onLose:9007 },
+  "L-35": { name:"蜥蜴人 L-35",         sprite:"🦎", hp:150, atk:[13,20], bg:"linear-gradient(180deg,#0a140a 0%,#1c301c 50%,#0a140a 100%)", onWin:2001, onLose:9007 },
+  "G-47": { name:"石像鬼 G-47",         sprite:"🗿", hp:165, atk:[14,19], bg:"linear-gradient(180deg,#100a14 0%,#241c30 50%,#100a14 100%)", onWin:1401, onLose:9007 },
+  "D-8":  { name:"龍 D-8",              sprite:"🐉", hp:180, atk:[16,21], bg:"linear-gradient(180deg,#140a0a 0%,#301c1c 50%,#140a0a 100%)", onWin:601,  onLose:9007 },
+  "BOSS-00": {
+    name:"原型-00「守望者」", sprite:"👁️", hp:300, atk:[18,28],
+    bg:"linear-gradient(180deg,#0a0a0a 0%,#2a1010 50%,#0a0a0a 100%)",
+    onWin: 50,     // 擊敗 → 前往地下一層檔案室
+    onLose: 9006,  // 血量歸零 → 直接進入隱藏結局（兵器化）
+    isBoss: true,
+    // TODO：補上完整戰鬥中台詞腳本，可在 battle 相關函式裡依血量百分比呼叫 setLog(...) 插入
+    dialogueTriggers: {
+      hp75: "TODO：補台詞（血量降至75%時觸發，暗示認出舊玩伴殘影）",
+      hp50: "TODO：補台詞（血量降至50%時觸發）",
+      hp25: "TODO：補台詞（血量降至25%時觸發）",
+    },
+  },
+};
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🎮 【可修改區域 5】劇情節點（30關 + 地下一二層 + 結局）      ║
+// ║                                                              ║
+// ║  一般節點：scene / character / text / bg_char                ║
+// ║    next: id       → 自動跳到下一節點                         ║
+// ║    choices:[...]  → 顯示選項按鈕，或單一 type:"input" 輸入框  ║
+// ║    ending:"名稱"  → 顯示結局畫面                             ║
+// ║    battle:"敵人id" → 播完文字後點擊進入戰鬥                   ║
+// ║    statChange:{...} → 套用數值變化（見區域6說明）             ║
+// ║    setFlags:{...}   → ★新增：設定旗標（見區域6說明）          ║
+// ║    statCheck:{...}  → ★新增：依 STATS 數值自動分支（見區域6） ║
+// ║    archiveRoom / dynamicEndings → ★新增：地下層專用特殊節點   ║
+// ║                                                              ║
+// ║  節點編號規則：以樓層數 ×100 為基底（例如 floor29 → 29xx），  ║
+// ║  地下一層=50，地下二層=60，結局＝9001~9006                    ║
+// ╚══════════════════════════════════════════════════════════════╝
+const STORY = {
+
+  // ───────────────── floor30：起始場景 ─────────────────
+  3000: {
+    scene:"tower_top", character:"narrator", bg_char:"🕯️",
+    text:"一個陰暗的房間，你坐在椅子上被綁住，身上穿著印有編號的衣服，眼前的門似乎被鎖住了。腦中一陣刺痛，記憶像被撕碎的羊皮紙——但內心深處有個聲音不斷催促著：逃離這裡。",
+    choices: [
+      { text:"觀察繩子", next:3001 },
+      { text:"呼救",     next:3002 },
+    ],
+  },
+  3001: { scene:"tower_top", character:"narrator", bg_char:"🕯️", text:"你仔細觀察，繩子似乎有點鬆動。", statChange:{int:2}, next:3003 },
+  3002: { scene:"tower_top", character:"narrator", bg_char:"🕯️", text:"你放聲呼救，但沒有人回應。",     statChange:{cha:2}, next:3003 },
+  3003: { scene:"tower_top", character:"narrator", bg_char:"🕯️", text:"你用力掙扎……繩子鬆動，你成功解開了！", statChange:{str:1}, next:3004 },
+  3004: {
+    scene:"tower_top", character:"narrator", bg_char:"🚪",
+    text:"門打不開，你決定：",
+    choices: [
+      { text:"瘋狂敲打", next:3005 },
+      { text:"觀察門",   next:3006 },
+    ],
+  },
+  3005: { scene:"tower_top", character:"narrator", bg_char:"🚪", text:"你瘋狂敲打，門鎖竟然壞了！門開了。", statChange:{str:3}, next:3007 },
+  3006: { scene:"tower_top", character:"narrator", bg_char:"🚪", text:"你仔細觀察，發現這是密碼鎖，你輸入了衣服上的編號——門開了。", next:3007 },
+  3007: {
+    scene:"tower_top", character:"narrator", bg_char:"🗝️",
+    // TODO：原劇本設計三扇門通往不同房間，僅作探索彩蛋（塗鴉/屍體/塗改痕跡），不影響進度。
+    // 目前先統一走同一條主線，待你補上三扇門各自的彩蛋文字後，可改成三選一但都 next 到 2900。
+    text:"門後有三條路，似乎都通往不同的房間，但最終都會接回同一段往下的階梯。（TODO：補上三扇門各自的探索彩蛋文字）",
+    next:2900,
+  },
+
+  // ───────────────── floor29：解謎文字① 誠實國/說謊國 ─────────────────
+  2900: {
+    scene:"tower_top", character:"narrator", bg_char:"📜",
+    text:"誠實國與說謊國學者開會，主席說共9人，但坐在主席左邊的人記錄為8人；每個人都說坐在自己右邊的是說謊國的人。請問實際有幾人參加？",
+    choices: [
+      { text:"7人", next:2901 },
+      { text:"8人", next:2903 },
+      { text:"9人", next:2902 },
+    ],
+  },
+  2901: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"你想了想……好像不太對，再想想看？", next:2900 },
+  2902: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"你想了想……好像不太對，再想想看？", next:2900 },
+  2903: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"沒錯，答案是8人。石門緩緩打開了。", next:2800 },
+
+  // ───────────────── floor28：怪物 三頭犬C-93 + 藥水 ─────────────────
+  2800: {
+    scene:"tower_top", character:"narrator", bg_char:"⚔️",
+    text:"難度最低的教學戰——三頭犬 C-93 擋在你面前。",
+    battle: "C-93",
+  },
+  2801: { scene:"tower_top", character:"narrator", bg_char:"🧪", text:"你擊敗了三頭犬，地上留下一瓶藥水。", statChange:{heal:[3,9]}, next:2700 },
+
+  // ───────────────── floor27：解謎數學① 數列規律（TODO） ─────────────────
+  2700: {
+    scene:"tower_top", character:"narrator", bg_char:"📜",
+    // TODO：原始題目為圖片題，答案為156，但此替代數列與答案156邏輯不連貫，
+    // 待你補上原始圖片素材後，修改本節點的 text / choices / 正確分支。
+    text:"（TODO：原始圖片題目缺失，暫以文字數列代替，數值待確認）一組數字依照固定倍率增加：3, 6, 12, 24, ?, 96",
+    choices: [
+      { text:"48",  next:2701 },
+      { text:"156", next:2703 },
+      { text:"72",  next:2701 },
+    ],
+  },
+  2701: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:2700 },
+  2703: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"（TODO：此為暫定通關答案，待原始素材確認後修改）門開了。", statChange:{heal:[3,9]}, next:2600 },
+
+  // ───────────────── floor26：永久 STR+5 ─────────────────
+  2600: { scene:"tower_top", character:"narrator", bg_char:"✨", text:"一座小型培養艙，觸碰後你感到一陣輕微的記憶閃回——彷彿曾經歷過類似的訓練。", statChange:{str:5, atk:3}, next:2500 },
+
+  // ───────────────── floor25：解謎文字⑤ 研究員日記（隱藏線索） ─────────────────
+  2500: {
+    scene:"tower_top", character:"narrator", bg_char:"📄",
+    text:"你在牆縫中找到一張泛黃的紙條：\n「開始的幾批實驗體都失敗了，真是令人沮喪。二號這孩子雖然活了下來，但精神狀態極不穩定。四周的守衛必須加強，絕不能讓任何人靠近高塔。」",
+    setFlags: { solvedDiary25:true, unlockedFloor24:true },
+    next: 2400,
+  },
+
+  // ───────────────── floor24：怪物 狼人W-12（隱藏密室） ─────────────────
+  2400: {
+    scene:"tower_top", character:"narrator", bg_char:"⚔️",
+    text:"因為你解開了日記中的線索，一扇隱藏的密室門緩緩開啟——狼人 W-12 守在裡面。",
+    battle: "W-12",
+  },
+  2401: { scene:"tower_top", character:"narrator", bg_char:"📦", text:"你擊敗了狼人，獲得一段額外的劇情碎片。（TODO：補上碎片具體內容）", next:2300 },
+
+  // ───────────────── floor23：藥水 ─────────────────
+  2300: { scene:"tower_top", character:"narrator", bg_char:"🧪", text:"地上散落著幾瓶藥水，你撿起並飲用。", statChange:{heal:[3,9]}, next:2200 },
+
+  // ───────────────── floor22：解謎文字② 顏色規律（TODO 缺圖） ─────────────────
+  2200: {
+    scene:"tower_top", character:"narrator", bg_char:"📜",
+    // TODO：原始為 5x5 圖形變色規律圖片題，需要補上圖片素材（可改用 <img> 或改寫成純文字題）
+    text:"（TODO：缺圖）5×5 格子中的圓圈依規律變色，問號處應填什麼顏色？",
+    choices: [
+      { text:"紅", next:2201 },
+      { text:"藍", next:2203 },
+      { text:"綠", next:2201 },
+    ],
+  },
+  2201: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:2200 },
+  2203: { scene:"tower_top", character:"narrator", bg_char:"📜", text:"（答案暫定為藍，待補圖確認）沒錯，門開了。", next:2100 },
+
+  // ───────────────── floor21：解謎數學② 符號推理 KFC（TODO 缺圖） ─────────────────
+  2100: {
+    scene:"tower_mid", character:"narrator", bg_char:"📜",
+    // TODO：原始為運算符號被替換成圖案的推理題，需要補上圖片素材
+    text:"（TODO：缺圖）運算符號被替換成圖案，經過推理後結果指向一個速食店縮寫。",
+    choices: [
+      { type:"input", placeholder:"輸入英文縮寫…", next:2101,
+        keywords:[ { words:["KFC","kfc"], next:2103 } ],
+        hint:"（答案暫定為 KFC，待補圖確認推理過程）" },
+    ],
+  },
+  2101: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:2100 },
+  2103: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"沒錯，就是 KFC。門開了。", next:2000 },
+
+  // ───────────────── floor20：怪物 蜥蜴人L-35 + 藥水 ─────────────────
+  2000: { scene:"tower_mid", character:"narrator", bg_char:"⚔️", text:"蜥蜴人 L-35 擋住了去路。", battle:"L-35" },
+  2001: { scene:"tower_mid", character:"narrator", bg_char:"🧪", text:"擊敗蜥蜴人後，你撿起一瓶藥水。", statChange:{heal:[3,9]}, next:1900 },
+
+  // ───────────────── floor19：解謎文字③ A/B/C說謊邏輯 ─────────────────
+  1900: {
+    scene:"tower_mid", character:"narrator", bg_char:"📜",
+    text:"A、B、C三人中只有一人說真話。A說「B在說謊」，B說「C在說謊」，C說「A、B都在說謊」。誰說真話？",
+    choices: [
+      { text:"A", next:1901 },
+      { text:"B", next:1903 },
+      { text:"C", next:1901 },
+    ],
+  },
+  1901: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:1900 },
+  1903: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"沒錯，是B。門開了。", next:1800 },
+
+  // ───────────────── floor18：永久 DEX+5 ─────────────────
+  1800: { scene:"tower_mid", character:"narrator", bg_char:"✨", text:"另一座培養艙，觸碰後又是一陣記憶閃回。（TODO：DEX 尚未連動任何機制，可在此加上敘事說明）", statChange:{dex:5}, next:1700 },
+
+  // ───────────────── floor17：解謎數學③ 六角拼圖（TODO 缺圖） ─────────────────
+  1700: {
+    scene:"tower_mid", character:"narrator", bg_char:"📜",
+    // TODO：原始為六角形拼圖規律圖片題，需要補上圖片素材
+    text:"（TODO：缺圖）六角形拼圖依規律排列，問號處應放上什麼數字？",
+    choices: [
+      { type:"input", placeholder:"輸入數字…", next:1701,
+        keywords:[ { words:["6"], next:1703 } ],
+        hint:"（答案暫定為 6，待補圖確認規律）" },
+    ],
+  },
+  1701: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:1700 },
+  1703: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"沒錯，是 6。門開了。", next:1600 },
+
+  // ───────────────── floor16：藥水 ─────────────────
+  1600: { scene:"tower_mid", character:"narrator", bg_char:"🧪", text:"地上有藥水，你撿起並飲用。", statChange:{heal:[3,9]}, next:1500 },
+
+  // ───────────────── floor15：解謎文字④ 紀念亡友 Abel + 藥水 ─────────────────
+  1500: {
+    scene:"tower_mid", character:"narrator", bg_char:"📜",
+    text:"牆上刻著一串褪色的字跡，你依稀認出這是某個孩子的名字縮寫組合，你試著拼湊完整——",
+    choices: [
+      { type:"input", placeholder:"輸入名字…", next:1501,
+        keywords:[ { words:["abel","Abel","ABEL"], next:1503 } ] },
+    ],
+  },
+  1501: { scene:"tower_mid", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:1500 },
+  1503: {
+    scene:"tower_mid", character:"echo", bg_char:"🕯️",
+    // TODO：補上 Abel 回憶閃現的完整文字內容
+    text:"沒錯，是 Abel——這是你某個早逝玩伴的名字。（TODO：補上完整的回憶閃現文字）",
+    setFlags:{ remembersAbel:true }, statChange:{heal:[3,9]}, next:1400,
+  },
+
+  // ───────────────── floor14：怪物 石像鬼G-47 ─────────────────
+  1400: { scene:"tower_mid", character:"narrator", bg_char:"⚔️", text:"石像鬼 G-47 從陰影中現身。", battle:"G-47" },
+  1401: { scene:"tower_mid", character:"narrator", bg_char:"🚪", text:"擊敗石像鬼後，你繼續往下走。", next:1300 },
+
+  // ───────────────── floor13：解謎文字⑥ 孩子人數之謎 ─────────────────
+  1300: {
+    scene:"tower_lower", character:"narrator", bg_char:"📜",
+    text:"研究記錄殘頁上寫著：「共帶回12名孩子，實驗淘汰率83%。」你算了算，最後存活的孩子還剩幾人？",
+    choices: [
+      { text:"1人", next:1301 },
+      { text:"2人", next:1303 },
+      { text:"3人", next:1301 },
+    ],
+  },
+  1301: { scene:"tower_lower", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:1300 },
+  1303: {
+    scene:"tower_lower", character:"narrator", bg_char:"📜",
+    text:"沒錯，是2人（12 × 17% ≈ 2）。暗示你並非唯一倖存者……",
+    setFlags:{ knowsSurvivorCount:true }, next:1200,
+  },
+
+  // ───────────────── floor12：永久 血量上限+5 ─────────────────
+  1200: { scene:"tower_lower", character:"narrator", bg_char:"✨", text:"又一座培養艙，你感到一陣輕微的記憶閃回。", statChange:{hp:5}, next:1100 },
+
+  // ───────────────── floor11：解謎文字⑦ 鏡子邏輯（複製伏筆） ─────────────────
+  1100: {
+    scene:"tower_lower", character:"narrator", bg_char:"🪞",
+    text:"「鏡中的我舉起左手，我舉起的卻是右手；但鏡中的『我』，是否也在懷疑鏡子外的才是倒影？」\n房間裡有三面鏡子，只有一面鏡子裡的影像動作與現實不同步。請問，如何用最少的動作找出哪一面是「假鏡子」？",
+    choices: [
+      { text:"同時舉起雙手觀察三面鏡子反應", next:1103 },
+      { text:"對其中一面鏡子丟東西",         next:1101 },
+      { text:"把三面鏡子都打破",             next:1102 },
+    ],
+  },
+  1101: { scene:"tower_lower", character:"narrator", bg_char:"🪞", text:"好像不太對，再想想看？", next:1100 },
+  1102: { scene:"tower_lower", character:"narrator", bg_char:"🪞", text:"好像不太對，再想想看？", next:1100 },
+  1103: {
+    scene:"tower_lower", character:"narrator", bg_char:"🪞",
+    text:"沒錯，同時舉起雙手，動作不同步的那面即為異常——呼應著「你自己可能也是一面被替換的鏡子」的念頭。",
+    setFlags:{ suspectsMirror:true }, next:1104,
+  },
+  1104: {
+    scene:"tower_lower", character:"narrator", bg_char:"🪞",
+    text:"你盯著那面假鏡子，要不要進一步查看鏡子背後？",
+    choices: [
+      { text:"深入查看",       next:1105 },
+      { text:"不理會，繼續前進", next:1000 },
+    ],
+  },
+  1105: {
+    scene:"tower_lower", character:"echo", bg_char:"🪞",
+    // TODO：補上深入探索假鏡子後的完整劇情文字
+    text:"（TODO：補上深入探索假鏡子後的劇情文字，此為結局2「複製人研究」的觸發條件之一）",
+    setFlags:{ exploredMirrorDeep:true }, next:1000,
+  },
+
+  // ───────────────── floor10：藥水 ─────────────────
+  1000: { scene:"tower_lower", character:"narrator", bg_char:"🧪", text:"地上有藥水，你撿起並飲用。", statChange:{heal:[3,9]}, next:900 },
+
+  // ───────────────── floor9：解謎數學④ 數字規律（TODO 缺圖） + 藥水 ─────────────────
+  900: {
+    scene:"tower_lower", character:"narrator", bg_char:"📜",
+    // TODO：原始為數字規律圖片題，需要補上圖片素材
+    text:"（TODO：缺圖）數字間有某種規律，請找出「？」應填什麼？",
+    choices: [
+      { type:"input", placeholder:"輸入數字…", next:901,
+        keywords:[ { words:["2"], next:903 } ],
+        hint:"（答案暫定為 2，待補圖確認規律）" },
+    ],
+  },
+  901: { scene:"tower_lower", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:900 },
+  903: { scene:"tower_lower", character:"narrator", bg_char:"📜", text:"沒錯，是 2。地上還有一瓶藥水。", statChange:{heal:[3,9]}, next:800 },
+
+  // ───────────────── floor8：永久 INT+5 ─────────────────
+  800: { scene:"tower_lower", character:"narrator", bg_char:"✨", text:"又一座培養艙，記憶閃回越來越清晰了。", statChange:{int:5}, next:700 },
+
+  // ───────────────── floor7：解謎文字⑧ 牆上刻的名字（INT判定，★statCheck） ─────────────────
+  700: {
+    scene:"tower_lower", character:"narrator", bg_char:"🪦",
+    text:"牆角刻著三個名字：「Abel」、「Mira」、「Юri」，旁邊被刀刻掉了第四個名字，只留下模糊的字首「07」。你忽然感到一陣暈眩——",
+    statCheck: { stat:"INT", threshold:9, passNext:701, failNext:702 },
+  },
+  701: { scene:"tower_lower", character:"echo", bg_char:"🪦", text:"你隱約想起，那個被刮掉的名字，好像跟你有關。", setFlags:{ sawCarvedNames:true }, next:600 },
+  702: { scene:"tower_lower", character:"narrator", bg_char:"🪦", text:"你只覺得頭痛欲裂，什麼都想不起來。", next:600 },
+
+  // ───────────────── floor6：怪物 龍D-8 + 藥水 ─────────────────
+  600: { scene:"tower_lower", character:"narrator", bg_char:"⚔️", text:"最終戰前最強的雜兵——龍 D-8 出現了。", battle:"D-8" },
+  601: { scene:"tower_lower", character:"narrator", bg_char:"🧪", text:"擊敗巨龍後，你撿起最後一瓶藥水。", statChange:{heal:[3,9]}, next:500 },
+
+  // ───────────────── floor5：永久 CHA+5 ─────────────────
+  500: { scene:"tower_lower", character:"narrator", bg_char:"✨", text:"最後一座培養艙，記憶閃回幾乎要拼湊完整。（TODO：CHA 尚未連動任何機制，可用於未來結局門檻）", statChange:{cha:5}, next:400 },
+
+  // ───────────────── floor4：解謎數學⑤ 節能倍增公式 ─────────────────
+  400: {
+    scene:"tower_lower", character:"narrator", bg_char:"📜",
+    text:"控制面板上有一串數字：2, 4, 8, 16, ? 這是塔內動力系統的節能倍增公式。",
+    choices: [
+      { text:"24", next:401 },
+      { text:"32", next:403 },
+      { text:"20", next:401 },
+    ],
+  },
+  401: { scene:"tower_lower", character:"narrator", bg_char:"📜", text:"好像不太對，再想想看？", next:400 },
+  403: { scene:"tower_lower", character:"narrator", bg_char:"📜", text:"沒錯，是 32。門開了。", next:300 },
+
+  // ───────────────── floor3：解謎文字⑨ 身世編號謎題（正式揭露伏筆） ─────────────────
+  300: {
+    scene:"tower_lower", character:"narrator", bg_char:"🔢",
+    // TODO：確認正式編號是否為完整四位數（例如 0724，呼應 floor25），此處暫用文件中提到的 07
+    text:"控制室門口的鎖需要輸入四位數編號才能通過，牆上留有提示：「若你忘記自己是誰，答案就刻在你身上。」（TODO：確認正式編號，此處暫用 07）",
+    choices: [
+      { type:"input", placeholder:"輸入編號…", next:301,
+        keywords:[ { words:["07","7"], next:303 } ] },
+    ],
+  },
+  301: { scene:"tower_lower", character:"narrator", bg_char:"🔢", text:"好像不太對，再想想看？", next:300 },
+  303: { scene:"tower_lower", character:"narrator", bg_char:"🔢", text:"沒錯……那是你自己的編號。門開了。", setFlags:{ recalledNumber:true }, next:200 },
+
+  // ───────────────── floor2：解謎數學⑥ 最終謎題（★動態答案） ─────────────────
+  200: {
+    scene:"tower_lower", character:"narrator", bg_char:"🔒",
+    text:"在END BOSS門前，最後一道鎖需要驗證：「07 加上你在這座塔裡失去的朋友人數，等於多少？」",
+    choices: [
+      { type:"input", placeholder:"輸入數字…",
+        // ★動態答案：07 + 已收集的亡友線索旗標數量（目前計入 remembersAbel、sawCarvedNames）
+        // TODO：確認最終應計入哪些旗標，或改成固定答案
+        dynamic: { base:7, countFlags:["remembersAbel","sawCarvedNames"] },
+        correctNext: 100,
+        wrongNext: 201,
+        hint:"提示：07 加上你目前已收集的亡友線索數量" },
+    ],
+  },
+  201: { scene:"tower_lower", character:"narrator", bg_char:"🔒", text:"好像不太對，再想想看？", next:200 },
+
+  // ───────────────── floor1：END BOSS ─────────────────
+  100: {
+    scene:"boss_hall", character:"narrator", bg_char:"👁️",
+    text:"這具兵器的外型，與你舊玩伴們有著幾分相似的殘影——身上甚至還留著和你相同款式的編號衣服殘片。（TODO：補上完整戰鬥台詞腳本，見 ENEMIES 的 BOSS-00 項目的 dialogueTriggers）",
+    battle: "BOSS-00",
+  },
+
+  // ───────────────── 地下一層：檔案室（★archiveRoom） ─────────────────
+  50: {
+    scene:"archive", character:"narrator", bg_char:"📁",
+    archiveRoom: true,
+    requiresFlags: ["solvedDiary25","knowsSurvivorCount","suspectsMirror","sawCarvedNames","recalledNumber"],
+    minCount: 3,
+    fullText:"「實驗體07號，代號：主角原名。植入記憶模板來源：已故音樂家/或設定為某位亡友的人格殘片。目前情感反饋數值波動過大，建議持續施打鎮定劑。若情感崩潰指數超標，啟動『兵器化』協議。」",
+    // TODO：補齊旗標不足3個時，檔案室顯示的「不完整檔案」版本文字
+    partialText:"（TODO：補上旗標不足3個時的替代版本文字）房間裡堆滿了燒毀的檔案，你什麼線索都拼湊不出來。",
+    next: 60,
+  },
+
+  // ───────────────── 地下二層：核心控制室（★dynamicEndings） ─────────────────
+  60: {
+    scene:"core", character:"narrator", bg_char:"🖥️",
+    text:"最終抉擇的時刻到了。",
+    dynamicEndings: true,
+    endingOptions: [
+      // TODO：原文件建議「摧毀高塔」門檻為玩過程中偏向 STR 選項的次數，此處先開放無門檻
+      { label:"引爆核心，摧毀高塔",               requirement:"always",              next:9001 },
+      { label:"潛入研究室帶走複製人資料",           requirement:"flag:suspectsMirror", next:9002 },
+      { label:"直接離開高塔前往最近村莊",           requirement:"always",              next:9003 },
+      // TODO：原文件建議「找商隊」門檻為 CHA 累積值，此處先開放無門檻
+      { label:"循著補給路線去找商隊",               requirement:"always",              next:9004 },
+      { label:"（隱藏選項）追問到底——真結局",       requirement:"flag:b1FullArchiveTriggered", next:9005 },
+    ],
+  },
+
+  // ───────────────── 結局 ─────────────────
+  9001: { scene:"core", character:"narrator", bg_char:"💥", text:"TODO：補上「結局1：摧毀高塔」的完整結局文字。", ending:"結局1 — 摧毀高塔" },
+  9002: { scene:"core", character:"narrator", bg_char:"🧬", text:"TODO：補上「結局2：複製人技術／基因改造研究」的完整結局文字。", ending:"結局2 — 複製人研究" },
+  9003: { scene:"core", character:"narrator", bg_char:"🏘️", text:"TODO：補上「結局3：村莊學者」的完整結局文字。", ending:"結局3 — 村莊學者" },
+  9004: { scene:"core", character:"narrator", bg_char:"🧳", text:"TODO：補上「結局4：貿易商人」的完整結局文字。", ending:"結局4 — 貿易商人" },
+  9005: { scene:"core", character:"narrator", bg_char:"🪞", text:"TODO：補上「真結局：揭露身世」的完整結局文字，需整合地下一層檔案室內容與各旗標線索。", ending:"真結局 — 揭露身世" },
+  9006: {
+    scene:"boss_hall", character:"echo", bg_char:"⚙️",
+    text:"……鎮定劑濃度不足，啟動B協議。\n\nTODO：補上完整結局文字（兵器視角）。",
+    setFlags:{ hpZeroAtBoss:true },
+    ending:"隱藏結局 — 成為戰爭兵器",
+  },
+  // ★新增：一般怪物（非BOSS）戰敗時的失敗結局，所有非BOSS怪物的 onLose 都指向這裡
+  // TODO：補上完整的失敗結局文字；如果想讓不同怪物有不同的失敗結局，
+  // 可以複製這個節點改成 9008、9009……再把對應怪物的 onLose 指過去即可。
+  9007: {
+    scene:"tower_lower", character:"narrator", bg_char:"💀",
+    text:"你倒下了……黑暗吞沒了一切。\n\nTODO：補上完整的失敗結局文字（例如：你被拖回實驗室，成為下一批被淘汰的實驗體）。",
+    ending:"戰敗結局 — 倒在高塔之中",
+  },
+};
+
+// ════════════════════════════════════════════════════════════════
+//  遊戲引擎（以下大部分沿用模板，★標記處為新增擴充）
+// ════════════════════════════════════════════════════════════════
+const ROMAN = ["Ⅰ","Ⅱ","Ⅲ","Ⅳ","Ⅴ"];
+
+// ════════════════════════════════════════════════════════════════
+//  🎵 【可修改區域】音效設定
+//  把你的音樂/音效檔名填入對應欄位（目前皆為 TODO 佔位檔名，
+//  尚未放入實際音檔，設為 null 即可停用該項）
+// ════════════════════════════════════════════════════════════════
+const AUDIO_FILES = {
+  bgm: {
+    tower_top:   null, // TODO：補上高塔上層 BGM 檔名，例如 "bgm_tower_top.mp3"
+    tower_mid:   null, // TODO：補上高塔中層 BGM 檔名
+    tower_lower: null, // TODO：補上高塔下層 BGM 檔名
+    boss_hall:   null, // TODO：補上決戰 BGM 檔名
+    archive:     null, // TODO：補上檔案室 BGM 檔名
+    core:        null, // TODO：補上核心控制室 BGM 檔名
+    battle:      null, // TODO：補上戰鬥 BGM 檔名
+    title:       null, // TODO：補上標題畫面 BGM 檔名
+  },
+  sfx: {
+    click:   null, // TODO
+    attack:  null, // TODO
+    heavy:   null, // TODO
+    miss:    null, // TODO
+    heal:    null, // TODO
+    hit:     null, // TODO
+    victory: null, // TODO
+    defeat:  null, // TODO
+    flee:    null, // TODO
+  },
+  volume: { bgm: 0.5, sfx: 0.8 },
+};
+
+// ── 音效引擎（不需要修改）────────────────────────
+const AUDIO = { bgm: null, bgmFile: null };
+
+function playBGM(file) {
+  if (!file || AUDIO.bgmFile === file) return;
+  if (AUDIO.bgm) { AUDIO.bgm.pause(); AUDIO.bgm = null; }
+  AUDIO.bgmFile = file;
+  AUDIO.bgm = new Audio(file);
+  AUDIO.bgm.loop   = true;
+  AUDIO.bgm.volume = AUDIO_FILES.volume.bgm;
+  AUDIO.bgm.play().catch(() => {});
+}
+function stopBGM() {
+  if (AUDIO.bgm) { AUDIO.bgm.pause(); AUDIO.bgm = null; }
+  AUDIO.bgmFile = null;
+}
+function playSFX(file) {
+  if (!file) return;
+  const s = new Audio(file);
+  s.volume = AUDIO_FILES.volume.sfx;
+  s.play().catch(() => {});
 }
 
-function loadScene(id) {
-  const scene = STORY.scenes[id];
-  if (!scene) { console.error('找不到場景:', id); return; }
-  currentScene = id;
+let currentNode  = 0;
+let typeTimer    = null;
+let isTyping     = false;
+let isEnded      = false;
+let playerState  = null;
+let enemyState   = null;
+let battleLock   = false;
+let persistentHp = null; // 跨戰鬥保存血量，null = 尚未初始化
 
-  // 背景色
-  if (scene.bg) elBg.style.background = scene.bg;
+const elTitleScreen  = document.getElementById("title-screen");
+const elStoryScreen  = document.getElementById("story-screen");
+const elBattleScreen = document.getElementById("battle-screen");
+const elScene        = document.getElementById("scene");
+const elBgChar       = document.getElementById("bg-char");
+const elLabel        = document.getElementById("scene-label");
+const elClickHint    = document.getElementById("click-hint");
+const elDialog       = document.getElementById("dialog");
+const elCharName     = document.getElementById("char-name");
+const elText         = document.getElementById("text-content");
+const elCursor       = document.getElementById("cursor");
+const elChoices      = document.getElementById("choices");
+const elEnding       = document.getElementById("ending");
+const elEndingLabel  = document.getElementById("ending-label");
+const elDebugFlags   = document.getElementById("debug-flags");
 
-  // 場景標籤
-  elLabel.textContent = scene.scene || '';
+// ── 開頭 / 重來 ─────────────────────────────────
+function startGame() {
+  elTitleScreen.classList.add("hidden");
+  setTimeout(() => { elTitleScreen.style.display = "none"; }, 800);
+  playSFX(AUDIO_FILES.sfx.click);
+  render(3000, false);
+}
 
-  // 角色表情
-  if (scene.sprite !== undefined) {
-    elSprite.textContent = scene.sprite;
-    elSprite.style.opacity = '1';
-  }
+function restart() {
+  isEnded      = false;
+  currentNode  = 3000;
+  persistentHp = null;
+  Object.keys(FLAGS).forEach(k => FLAGS[k] = false);
+  Object.assign(STATS, { STR:5, DEX:5, INT:5, CHA:5 });
+  PLAYER_BASE.hp = 200;
+  PLAYER_BASE.atk = [8,14];
+  PLAYER_BASE.items.potion = 2;
+  showStory();
+  elTitleScreen.style.display = "flex";
+  elTitleScreen.style.opacity = "0";
+  elTitleScreen.classList.remove("hidden");
+  setTimeout(() => { elTitleScreen.style.opacity = "1"; }, 10);
+}
 
-  // 說話者
-  elSpeaker.textContent = scene.speaker || '';
+function showStory()  { elStoryScreen.style.display = "block"; elBattleScreen.style.display = "none"; }
+function showBattle() { elStoryScreen.style.display = "none";  elBattleScreen.style.display = "flex"; }
 
-  // 對話打字效果
-  fullText = scene.text || '';
-  shownText = '';
-  elDialog.innerHTML = '';
-  elChoices.innerHTML = '';
-  elHint.style.display = 'none';
-  isTyping = true;
+// ── 劇情渲染 ────────────────────────────────────
+function render(nodeId, animate = true) {
+  currentNode = nodeId;
+  const node  = STORY[nodeId];
+  const scene = SCENES[node.scene];
+  const char  = CHARACTERS[node.character];
 
+  if (animate) { elDialog.style.opacity = "0"; elBgChar.style.opacity = "0"; }
+
+  setTimeout(() => {
+    const sceneBgm = AUDIO_FILES.bgm[node.scene] || null;
+    playBGM(sceneBgm);
+    if (node.sfx) playSFX(node.sfx);
+
+    elScene.style.background   = scene.bg;
+    elScene.style.backgroundSize   = "cover";
+    elScene.style.backgroundPosition = "center";
+    elLabel.textContent        = scene.label;
+
+    if (node.bg_char && /\.(jpg|jpeg|png|gif|webp)$/i.test(node.bg_char)) {
+      const w = node.bg_char_width  || "auto";
+      const h = node.bg_char_height || "220px";
+      elBgChar.innerHTML = `<img src="${node.bg_char}" style="width:${w};height:${h};">`;
+    } else {
+      elBgChar.innerHTML = "";
+      elBgChar.textContent = node.bg_char || "";
+    }
+    elCharName.textContent    = "◆ " + char.name;
+    elCharName.style.color    = char.color;
+    elCharName.style.textShadow = `0 0 12px ${char.color}80`;
+    elChoices.innerHTML       = "";
+    elEnding.style.display    = "none";
+    elClickHint.style.display = "none";
+    elScene._battlePending    = null;
+    elDialog.style.opacity    = "1";
+    elBgChar.style.opacity    = "0.85";
+
+    // ★新增：地下一層檔案室，依旗標數量決定顯示哪個版本的文字
+    let displayText = node.text;
+    if (node.archiveRoom) {
+      const count = node.requiresFlags.filter(f => FLAGS[f]).length;
+      const full = count >= node.minCount;
+      FLAGS.b1FullArchiveTriggered = full;
+      displayText = full ? node.fullText : node.partialText;
+    }
+
+    typeText(displayText, () => {
+      // ── 套用數值變化 ──────────────────────────
+      if (node.statChange) applyStatChange(node.statChange);
+      // ★新增：套用旗標
+      if (node.setFlags) Object.assign(FLAGS, node.setFlags);
+      // ★新增：依 STATS 數值自動分支（例如 floor7 的 INT 判定）
+      if (node.statCheck) {
+        const { stat, threshold, passNext, failNext } = node.statCheck;
+        node.next = STATS[stat] >= threshold ? passNext : failNext;
+      }
+      updateDebugFlags();
+
+      if (node.battle) {
+        elClickHint.textContent   = "▶ 點擊進入戰鬥";
+        elClickHint.style.display = "block";
+        elScene._battlePending    = node.battle;
+      } else if (node.ending) {
+        showEndingScreen(node.ending);
+      } else if (node.dynamicEndings) {
+        // ★新增：地下二層依旗標動態顯示可選結局
+        showDynamicEndings(node);
+      } else if (node.choices) {
+        showChoices(node.choices);
+      } else if (node.next === null) {
+        showEndingScreen();
+      } else if (node.next !== undefined) {
+        elClickHint.textContent   = "▶ 點擊繼續";
+        elClickHint.style.display = "block";
+      }
+    });
+  }, animate ? 300 : 0);
+}
+
+function typeText(text, onDone) {
   clearInterval(typeTimer);
+  elText.textContent     = "";
+  elCursor.style.display = "inline";
+  isTyping = true;
   let i = 0;
   typeTimer = setInterval(() => {
-    if (i < fullText.length) {
-      shownText += fullText[i++];
-      elDialog.innerHTML = shownText + '<span id="cursor"></span>';
-    } else {
+    i++;
+    elText.textContent = text.slice(0, i);
+    if (i >= text.length) {
       clearInterval(typeTimer);
+      elCursor.style.display = "none";
       isTyping = false;
-      elDialog.innerHTML = shownText;
-      // 顯示選項或繼續提示
-      if (scene.choices) {
-        renderChoices(scene.choices);
-      } else if (!scene.ending) {
-        elHint.style.display = 'block';
-      }
+      if (onDone) onDone();
     }
-  }, TYPING_SPEED);
-
-  // 結局場景
-  if (scene.ending) {
-    setTimeout(() => showEnding(scene), fullText.length * TYPING_SPEED + 800);
-  }
-
-  // 進度條
-  updateProgress(id);
+  }, 25);
+  elText._fullText = text;
+  elText._onDone   = onDone;
 }
 
-function renderChoices(choices) {
-  elChoices.innerHTML = '';
-  choices.forEach((c, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.textContent = c.text;
-    btn.style.animationDelay = `${i * 80}ms`;
-    btn.style.opacity = '0';
-    btn.style.transform = 'translateY(10px)';
-    btn.style.transition = `opacity 0.3s ${i*80}ms, transform 0.3s ${i*80}ms, background 0.2s`;
-    setTimeout(() => {
-      btn.style.opacity = '1';
-      btn.style.transform = 'translateY(0)';
-    }, 50);
-    btn.onclick = () => {
-      elChoices.style.opacity = '0';
-      setTimeout(() => { elChoices.innerHTML = ''; loadScene(c.next); }, 300);
+function skipType() {
+  if (!isTyping) return;
+  clearInterval(typeTimer);
+  elText.textContent     = elText._fullText;
+  elCursor.style.display = "none";
+  isTyping = false;
+  if (elText._onDone) elText._onDone();
+}
+
+function showChoices(choices) {
+  elChoices.innerHTML = "";
+
+  // ── 文字輸入模式 ──────────────────────────────
+  // 節點格式: choices: [{ type:"input", placeholder:"...", next:id, keywords:[...] }]
+  // ★新增：也支援 dynamic:{base, countFlags} + correctNext/wrongNext（動態答案，見 floor2）
+  if (choices.length === 1 && choices[0].type === "input") {
+    const cfg = choices[0];
+    const wrap = document.createElement("div");
+    wrap.className = "text-input-wrap";
+
+    const input = document.createElement("input");
+    input.type        = "text";
+    input.className   = "text-input-field";
+    input.placeholder = cfg.placeholder || "輸入你的回應……";
+    input.maxLength   = 60;
+
+    const btn = document.createElement("button");
+    btn.className   = "text-input-send";
+    btn.textContent = "確認 ▶";
+
+    const hint = document.createElement("div");
+    hint.className   = "text-input-hint";
+    hint.textContent = cfg.hint || "";
+
+    const submit = () => {
+      const val = input.value.trim();
+      if (!val) return;
+      let nextId;
+      if (cfg.dynamic) {
+        // ★新增：動態答案比對
+        const count  = cfg.dynamic.countFlags.filter(f => FLAGS[f]).length;
+        const answer = String(cfg.dynamic.base + count);
+        nextId = (val === answer) ? cfg.correctNext : cfg.wrongNext;
+      } else {
+        nextId = cfg.next; // 預設節點（通常是答錯的分支）
+        if (cfg.keywords) {
+          for (const kw of cfg.keywords) {
+            if (kw.words.some(w => val.toLowerCase() === w.toLowerCase() || val.includes(w))) {
+              nextId = kw.next;
+              break;
+            }
+          }
+        }
+      }
+      render(nextId, true);
     };
+
+    btn.onclick = submit;
+    input.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+
+    wrap.appendChild(input);
+    wrap.appendChild(btn);
+    elChoices.appendChild(wrap);
+    if (hint.textContent) elChoices.appendChild(hint);
+    setTimeout(() => input.focus(), 50);
+    return;
+  }
+
+  // ── 一般選項按鈕 ──────────────────────────────
+  choices.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.className = "choice-btn";
+    btn.innerHTML = `<span class="choice-index">${ROMAN[i]}</span>${c.text}`;
+    btn.onclick = () => { playSFX(AUDIO_FILES.sfx.click); render(c.next, true); };
     elChoices.appendChild(btn);
   });
-  elChoices.style.opacity = '1';
 }
 
-function updateProgress(id) {
-  const m = STORY.milestones;
-  const idx = m.indexOf(id);
-  if (idx >= 0) {
-    const pct = Math.round(((idx + 1) / m.length) * 100);
-    elProgress.style.width = pct + '%';
-  }
+// ★新增：地下二層核心控制室的結局選單，依旗標篩選可選結局
+function showDynamicEndings(node) {
+  elChoices.innerHTML = "";
+  node.endingOptions.forEach(opt => {
+    const ok = opt.requirement === "always" ||
+      (opt.requirement.startsWith("flag:") && FLAGS[opt.requirement.slice(5)]);
+    if (!ok) return; // 未達成條件則不顯示；若想改成「顯示但鎖定」，可在此自行調整
+    const btn = document.createElement("button");
+    btn.className = "choice-btn";
+    btn.textContent = opt.label;
+    btn.onclick = () => { playSFX(AUDIO_FILES.sfx.click); render(opt.next, true); };
+    elChoices.appendChild(btn);
+  });
 }
 
-function showEnding(scene) {
-  elEndTitle.textContent = scene.endTitle || '結局';
-  elEndText.textContent = scene.endText || '';
-  elEnding.classList.add('show');
-  elProgress.style.width = '100%';
+function showEndingScreen(label) {
+  isEnded = true;
+  elEndingLabel.textContent = label ? `── ${label} ──` : "── END ──";
+  elEnding.style.display = "block";
 }
 
-function startGame() {
-  elEnding.classList.remove('show');
-  elProgress.style.width = '0%';
-  elBg.style.background = '#1a0a2e';
-  loadScene(STORY.startScene);
-}
+// ── 數值變化 ─────────────────────────────────────
+// 在 STORY 節點加入 statChange: { hp, damage, heal, atk, heavy, potion, str, dex, int, cha }
+//   hp     : 改變最大血量上限（正數增加，負數減少）
+//   damage : 扣除當前血量
+//   heal   : 回復當前血量，可填數字或 [最小,最大] 隨機範圍（★擴充，原模板只支援固定數字）
+//   atk    : 改變攻擊力
+//   heavy  : 改變重擊力
+//   potion : 改變藥水數量
+//   str/dex/int/cha : ★新增，改變 STATS 四維屬性
+function applyStatChange(s) {
+  const msgs = [];
 
-// 點擊跳過打字 / 繼續
-document.getElementById('dialog-box').addEventListener('click', () => {
-  if (isTyping) {
-    // 跳過打字動畫
-    clearInterval(typeTimer);
-    isTyping = false;
-    elDialog.innerHTML = fullText;
-    const scene = STORY.scenes[currentScene];
-    if (scene.choices) renderChoices(scene.choices);
-    else if (!scene.ending) elHint.style.display = 'block';
-  } else {
-    const scene = STORY.scenes[currentScene];
-    if (scene && scene.next && !scene.choices && !scene.ending) {
-      elHint.style.display = 'none';
-      loadScene(scene.next);
+  if (s.hp) {
+    PLAYER_BASE.hp = Math.max(1, PLAYER_BASE.hp + s.hp);
+    if (persistentHp !== null) {
+      persistentHp = s.hp > 0 ? persistentHp + s.hp : Math.min(persistentHp, PLAYER_BASE.hp);
     }
+    msgs.push(`${s.hp > 0 ? "❤️ 最大HP +" : "💔 最大HP "}${s.hp}`);
+  }
+
+  if (s.damage) {
+    const dmg = Math.abs(s.damage);
+    if (persistentHp === null) persistentHp = PLAYER_BASE.hp;
+    persistentHp = Math.max(1, persistentHp - dmg);
+    msgs.push(`💔 受到傷害 -${dmg}`);
+  }
+
+  if (s.heal) {
+    const amount = Array.isArray(s.heal) ? rand(s.heal[0], s.heal[1]) : Math.abs(s.heal);
+    if (persistentHp === null) persistentHp = PLAYER_BASE.hp;
+    persistentHp = Math.min(PLAYER_BASE.hp, persistentHp + amount);
+    msgs.push(`💚 回復血量 +${amount}`);
+  }
+
+  if (s.atk) {
+    PLAYER_BASE.atk[0] = Math.max(1, PLAYER_BASE.atk[0] + s.atk);
+    PLAYER_BASE.atk[1] = Math.max(1, PLAYER_BASE.atk[1] + s.atk);
+    msgs.push(`${s.atk > 0 ? "⚔️ 攻擊力 +" : "⚔️ 攻擊力 "}${s.atk}`);
+  }
+  if (s.heavy) {
+    PLAYER_BASE.heavy[0] = Math.max(1, PLAYER_BASE.heavy[0] + s.heavy);
+    PLAYER_BASE.heavy[1] = Math.max(1, PLAYER_BASE.heavy[1] + s.heavy);
+    msgs.push(`${s.heavy > 0 ? "💥 重擊力 +" : "💥 重擊力 "}${s.heavy}`);
+  }
+  if (s.potion) {
+    PLAYER_BASE.items.potion = Math.max(0, PLAYER_BASE.items.potion + s.potion);
+    msgs.push(`${s.potion > 0 ? "🧪 藥水 +" : "🧪 藥水 "}${s.potion}`);
+  }
+
+  // ★新增：STR/DEX/INT/CHA
+  ["str","dex","int","cha"].forEach(key => {
+    if (s[key]) {
+      const statKey = key.toUpperCase();
+      STATS[statKey] += s[key];
+      msgs.push(`${s[key] > 0 ? `${statKey} +` : `${statKey} `}${s[key]}`);
+    }
+  });
+
+  if (msgs.length > 0) showStatToast(msgs);
+}
+
+function showStatToast(msgs) {
+  const el = document.createElement("div");
+  el.className = "stat-toast";
+  el.innerHTML = msgs.map(m => `<div>${m}</div>`).join("");
+  document.getElementById("dialog").appendChild(el);
+  setTimeout(() => el.classList.add("show"), 10);
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 400);
+  }, 2200);
+}
+
+// ★新增：左上角四維屬性面板（已隱藏旗標清單，避免玩家看到觸發結局的條件）
+// 若不需要顯示，把下面這行 elDebugFlags.style.display 改成 "none"，或直接刪除 #debug-flags 相關程式碼
+function updateDebugFlags() {
+  elDebugFlags.style.display = "block";
+  elDebugFlags.innerHTML =
+    `力量 ${STATS.STR}　敏捷 ${STATS.DEX}　智力 ${STATS.INT}　魅力 ${STATS.CHA}`;
+  // 旗標（FLAGS）不在此顯示，避免暴露結局觸發條件。
+  // 如果你自己開發測試需要看旗標狀態，可以暫時加回：
+  // + "<br>" + Object.keys(FLAGS).map(k => `${FLAGS[k] ? "✅" : "▫️"} ${k}`).join("　")
+}
+
+elScene.addEventListener("click", () => {
+  if (isEnded) return;
+  if (isTyping) { skipType(); return; }
+  if (elScene._battlePending) {
+    const id = elScene._battlePending;
+    elScene._battlePending    = null;
+    elClickHint.style.display = "none";
+    startBattle(id);
+    return;
+  }
+  const node = STORY[currentNode];
+  if (!node.choices && !node.battle && !node.ending && !node.dynamicEndings && node.next !== null && node.next !== undefined) {
+    render(node.next, true);
   }
 });
 
-// 初始化
-makeStars();
-startGame();
+elDialog.addEventListener("click", (e) => {
+  if (e.target.closest(".choice-btn") || e.target.closest("#restart-btn") || e.target.closest(".text-input-wrap")) return;
+  if (isEnded) return;
+  if (isTyping) { skipType(); return; }
+  const node = STORY[currentNode];
+  if (!node.choices && !node.battle && !node.ending && !node.dynamicEndings && node.next !== null && node.next !== undefined) {
+    render(node.next, true);
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  ⚔️ 戰鬥系統（沿用模板，僅敵人資料表改為本作內容）
+// ════════════════════════════════════════════════════════════════
+function startBattle(enemyId) {
+  playBGM(AUDIO_FILES.bgm.battle);
+  const eData = ENEMIES[enemyId];
+  playerState = {
+    currentHp: persistentHp ?? PLAYER_BASE.hp,
+    items:     { potion: PLAYER_BASE.items.potion },
+    enemyId,
+  };
+  enemyState = { ...eData, currentHp: eData.hp };
+
+  document.getElementById("player-sprite").textContent = PLAYER_BASE.sprite;
+  document.getElementById("player-name").textContent   = PLAYER_BASE.name;
+  document.getElementById("enemy-sprite").textContent  = eData.sprite;
+  document.getElementById("enemy-name").textContent    = eData.name;
+  document.getElementById("battle-stage").style.background = eData.bg;
+
+  updateHpUI();
+  updateItemUI();
+  setLog(`⚔️ ${eData.name} 出現了！選擇你的行動。`);
+  setActionLock(false);
+  showBattle();
+}
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function playerAction(type) {
+  if (battleLock) return;
+  setActionLock(true);
+
+  if (type === "attack") {
+    const dmg = rand(...PLAYER_BASE.atk);
+    setLog(`你發動攻擊！造成 ${dmg} 點傷害。`);
+    playSFX(AUDIO_FILES.sfx.attack);
+    animateAttack("player-sprite", "attack-right");
+    setTimeout(() => { playSFX(AUDIO_FILES.sfx.hit); dealDmgToEnemy(dmg); }, 400);
+
+  } else if (type === "heavy") {
+    if (Math.random() < 0.25) {
+      setLog("你全力一擊……但失手了！");
+      playSFX(AUDIO_FILES.sfx.miss);
+      setTimeout(enemyTurn, 700);
+    } else {
+      const dmg = rand(...PLAYER_BASE.heavy);
+      setLog(`💥 重擊！造成 ${dmg} 點傷害！`);
+      playSFX(AUDIO_FILES.sfx.heavy);
+      animateAttack("player-sprite", "attack-right");
+      setTimeout(() => { playSFX(AUDIO_FILES.sfx.hit); dealDmgToEnemy(dmg); }, 400);
+    }
+
+  } else if (type === "flee") {
+    if (Math.random() < 0.5) {
+      setLog("你趁亂逃跑了！");
+      playSFX(AUDIO_FILES.sfx.flee);
+      setTimeout(() => { showStory(); render(ENEMIES[playerState.enemyId].onLose, true); }, 1200);
+    } else {
+      setLog("逃跑失敗！敵人擋住了去路。");
+      playSFX(AUDIO_FILES.sfx.miss);
+      setTimeout(enemyTurn, 700);
+    }
+  }
+}
+
+function dealDmgToEnemy(dmg) {
+  enemyState.currentHp = Math.max(0, enemyState.currentHp - dmg);
+  showDmgPopup("enemy-side", dmg, "enemy");
+  animateHit("enemy-sprite");
+  updateHpUI();
+  if (enemyState.currentHp <= 0) { battleEnd(true); return; }
+  setTimeout(enemyTurn, 700);
+}
+
+function useItem(type) {
+  if (battleLock) return;
+  if (type === "potion") {
+    if (playerState.items.potion <= 0) return;
+    setActionLock(true);
+    playerState.items.potion--;
+    const heal = Math.min(PLAYER_BASE.potionHeal, PLAYER_BASE.hp - playerState.currentHp);
+    playerState.currentHp += heal;
+    updateItemUI();
+    updateHpUI();
+    showDmgPopup("player-side", `+${heal}`, "heal");
+    playSFX(AUDIO_FILES.sfx.heal);
+    setLog(`🧪 使用回復藥水，恢復了 ${heal} 點 HP！`);
+    setTimeout(enemyTurn, 700);
+  }
+}
+
+function enemyTurn() {
+  const dmg = rand(...enemyState.atk);
+  setLog(`${enemyState.name} 發起攻擊！你受到 ${dmg} 點傷害。`);
+  animateAttack("enemy-sprite", "attack-left");
+  setTimeout(() => {
+    playSFX(AUDIO_FILES.sfx.hit);
+    playerState.currentHp = Math.max(0, playerState.currentHp - dmg);
+    showDmgPopup("player-side", dmg, "player");
+    animateHit("player-sprite");
+    updateHpUI();
+    if (playerState.currentHp <= 0) { battleEnd(false); return; }
+    setActionLock(false);
+  }, 400);
+}
+
+function battleEnd(win) {
+  persistentHp = win ? playerState.currentHp : null;
+  setActionLock(true);
+  stopBGM();
+  playSFX(win ? AUDIO_FILES.sfx.victory : AUDIO_FILES.sfx.defeat);
+  const nextNode = win
+    ? ENEMIES[playerState.enemyId].onWin
+    : ENEMIES[playerState.enemyId].onLose;
+  setLog(win ? "🎉 你獲得了勝利！" : "💀 你被擊倒了……");
+  setTimeout(() => {
+    showStory();
+    render(nextNode, true);
+  }, 1400);
+}
+
+// ── HP / 道具 UI ─────────────────────────────────
+function updateHpUI() {
+  setHpBar("player", playerState.currentHp, PLAYER_BASE.hp);
+  setHpBar("enemy",  enemyState.currentHp,  enemyState.hp);
+}
+function setHpBar(who, cur, max) {
+  const pct = Math.max(0, cur / max * 100);
+  const bar  = document.getElementById(`${who}-hp-bar`);
+  bar.style.width  = pct + "%";
+  bar.className    = "hp-bar " + (pct > 50 ? "green" : pct > 25 ? "yellow" : "red");
+  document.getElementById(`${who}-hp-text`).textContent = `${Math.max(0,cur)} / ${max}`;
+}
+function updateItemUI() {
+  const n   = playerState.items.potion;
+  document.getElementById("potion-count").textContent = `×${n}`;
+  document.getElementById("potion-btn").disabled      = n <= 0;
+}
+function setLog(msg) { document.getElementById("battle-log-area").textContent = msg; }
+function setActionLock(locked) {
+  battleLock = locked;
+  document.querySelectorAll(".action-btn, .item-btn").forEach(b => b.disabled = locked);
+}
+
+// ── 動畫 ─────────────────────────────────────────
+function animateAttack(id, cls) {
+  const el = document.getElementById(id);
+  el.classList.remove("attack-right","attack-left","shake");
+  void el.offsetWidth;
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 450);
+}
+function animateHit(id) {
+  const el = document.getElementById(id);
+  el.classList.remove("shake");
+  void el.offsetWidth;
+  el.classList.add("shake");
+  setTimeout(() => el.classList.remove("shake"), 450);
+}
+function showDmgPopup(parentId, value, type) {
+  const parent = document.getElementById(parentId);
+  const el = document.createElement("div");
+  el.className    = `dmg-popup ${type}`;
+  el.textContent  = type === "heal" ? String(value) : `-${value}`;
+  el.style.left   = (30 + Math.random() * 50) + "px";
+  el.style.top    = "20px";
+  parent.style.position = "relative";
+  parent.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
 </script>
 </body>
 </html>
